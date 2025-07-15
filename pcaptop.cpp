@@ -30,6 +30,8 @@ WINDOW *titlewin;
 WINDOW *scrollwin;
 WINDOW *topwin;
 
+int highlight = 0;
+int key;
 char *myip;
 bool use_color;
 std::unordered_map<std::string, int> ips;
@@ -51,6 +53,18 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
     ips[ip] += 1;
   }
 
+  key = getch();
+  // fprintf(stderr, "%d", key);
+  if (key == KEY_UP) {
+    highlight -= 1;
+    if (highlight < 0)
+      highlight = 0;
+  } else if (key == KEY_DOWN) {
+    highlight += 1;
+    if (highlight > 9)
+      highlight = 9;
+  }
+
   std::vector<pair> vec;
 
   // copy key-value pairs from the map to the vector
@@ -69,8 +83,17 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
 
   for (int i = 0; i < 10; i++) {
 
+    if (key == 127 && highlight == i) {
+      ips[vec[i].first] = 0;
+      key = 0;
+    }
+
     if (vec[i].second < 1) {
       break;
+    }
+
+    if (i == highlight) {
+      wattron(topwin, A_REVERSE);
     }
 
     if (use_color && vec[i].second > 1000) {
@@ -83,6 +106,7 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
     if (use_color && vec[i].second > 1000) {
       wattroff(topwin, COLOR_PAIR(RED));
     }
+    wattroff(topwin, A_REVERSE);
 
     wrefresh(topwin);
   }
@@ -117,7 +141,8 @@ int main(int argc, char *argv[]) {
 
   noecho();
   cbreak();
-  // keypad(stdscr, TRUE);
+  timeout(100);
+  keypad(stdscr, TRUE);
   curs_set(0);
 
   int height, width;
