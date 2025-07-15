@@ -78,6 +78,7 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
     }
     return l.first > r.first;
   });
+
   wprintw(scrollwin, "%15s (%6i)\n", ip, ips[ip]);
   wrefresh(scrollwin);
 
@@ -165,14 +166,19 @@ int main(int argc, char *argv[]) {
   mvwprintw(titlewin, 1, 45, "Top");
   wrefresh(titlewin);
 
+  // if an interface was specified in argv[1] then iterate until we find it,
+  // else list all available interfaces
   if (!argv[1]) {
 
     for (interface = alldevsp; interface != NULL; interface = interface->next) {
       fprintf(stderr, "Device: %s\n", interface->name);
     }
     return 0;
+
   } else {
+
     for (interface = alldevsp; interface != NULL; interface = interface->next) {
+
       if (strcmp(interface->name, argv[1]) == 0) {
         dev = interface->name;
         fprintf(stderr, "Device found: %s\n", dev);
@@ -205,6 +211,7 @@ int main(int argc, char *argv[]) {
     return (2);
   }
 
+  // if a port was specified in argv[2] then create a filter for it
   if (argv[2]) {
     strcpy(filter_exp, (char *)strcat(filter_exp, argv[2]));
 
