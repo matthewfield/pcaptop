@@ -56,6 +56,8 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
     } else {
       ips[ip] += 1;
     }
+    wprintw(scrollwin, "%15s (%6i)\n", ip, ips[ip]);
+    wrefresh(scrollwin);
   }
 
   key = getch();
@@ -84,18 +86,22 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
     return l.first > r.first;
   });
 
-  wprintw(scrollwin, "%15s (%6i)\n", ip, ips[ip]);
-  wrefresh(scrollwin);
-
   for (int i = 0; i < 10; i++) {
 
     if (key == 127 && highlight == i) {
       ignored[vec[i].first] = vec[i].second;
       ips[vec[i].first] = 0;
+      highlight--;
+      if (highlight < 0)
+        highlight = 0;
       key = 0;
     }
 
     if (vec[i].second < 1) {
+      for (int j = i; j < 10; j++) {
+        mvwprintw(topwin, j + 1, 2, "%28s", " ");
+      }
+      wrefresh(topwin);
       break;
     }
 
