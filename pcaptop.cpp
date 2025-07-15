@@ -32,9 +32,11 @@ WINDOW *topwin;
 
 int highlight = 0;
 int key;
+int c;
 char *myip;
 bool use_color;
 std::unordered_map<std::string, int> ips;
+std::unordered_map<std::string, int> ignored;
 
 void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
               const u_char *packet) {
@@ -47,10 +49,13 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
   if (strcmp(ip, myip) == 0)
     return;
 
-  if (ips.find(ip) == ips.end()) {
-    ips[ip] = 1;
-  } else {
-    ips[ip] += 1;
+  if (ignored.find(ip) == ignored.end()) {
+
+    if (ips.find(ip) == ips.end()) {
+      ips[ip] = 1;
+    } else {
+      ips[ip] += 1;
+    }
   }
 
   key = getch();
@@ -85,6 +90,7 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
   for (int i = 0; i < 10; i++) {
 
     if (key == 127 && highlight == i) {
+      ignored[vec[i].first] = vec[i].second;
       ips[vec[i].first] = 0;
       key = 0;
     }
@@ -108,9 +114,15 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
       wattroff(topwin, COLOR_PAIR(RED));
     }
     wattroff(topwin, A_REVERSE);
-
-    wrefresh(topwin);
   }
+
+  c = 13;
+
+  for (auto &ig : ignored) {
+    mvwprintw(topwin, c, 2, "%15s (%6i)", ig.first.c_str(), ig.second);
+    c++;
+  }
+  wrefresh(topwin);
 }
 
 int main(int argc, char *argv[]) {
@@ -150,6 +162,7 @@ int main(int argc, char *argv[]) {
 
   getmaxyx(stdscr, height, width);
   refresh();
+  height = 30;
   titlewin = newwin(3, 64, 1, 1);
   box(titlewin, 0, 0);
   mainwin = newwin(height - 4, 32, 4, 1);
@@ -158,6 +171,7 @@ int main(int argc, char *argv[]) {
   topwin = newwin(height - 4, 32, 4, 33);
   box(topwin, 0, 0);
   wrefresh(mainwin);
+  mvwprintw(topwin, 12, 12, "Ignored");
   wrefresh(topwin);
 
   scrollok(scrollwin, TRUE);
