@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <arpa/inet.h>
+#include <format>
 #include <iostream>
 #include <ncurses.h>
 #include <net/ethernet.h>
@@ -92,7 +93,7 @@ int main(int argc, char *argv[]) {
   char *dev = NULL;              /* The device to sniff on */
   char errbuf[PCAP_ERRBUF_SIZE]; /* Error string */
   struct bpf_program fp;         /* The compiled filter */
-  char filter_exp[] = "port 23"; /* The filter expression */
+  char filter_exp[10] = "port "; /* The filter expression */
   bpf_u_int32 mask;              /* Our netmask */
   bpf_u_int32 net;               /* Our IP */
   struct pcap_pkthdr header;     /* The header that pcap gives us */
@@ -178,17 +179,23 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Couldn't open device %s: %s\n", dev, errbuf);
     return (2);
   }
-  /* Compile and apply the filter */
-  // if (pcap_compile(handle, &fp, filter_exp, 0, net) == -1) {
-  //   fprintf(stderr, "Couldn't parse filter %s: %s\n", filter_exp,
-  //           pcap_geterr(handle));
-  //   return (2);
-  // }
-  // if (pcap_setfilter(handle, &fp) == -1) {
-  //   fprintf(stderr, "Couldn't install filter %s: %s\n", filter_exp,
-  //           pcap_geterr(handle));
-  //   return (2);
-  // }
+
+  if (argv[2]) {
+    strcpy(filter_exp, (char *)strcat(filter_exp, argv[2]));
+
+    /* Compile and apply the filter */
+    if (pcap_compile(handle, &fp, filter_exp, 0, net) == -1) {
+      fprintf(stderr, "Couldn't parse filter %s: %s\n", filter_exp,
+              pcap_geterr(handle));
+      return (2);
+    }
+    if (pcap_setfilter(handle, &fp) == -1) {
+      fprintf(stderr, "Couldn't install filter %s: %s\n", filter_exp,
+              pcap_geterr(handle));
+      return (2);
+    }
+    fprintf(stderr, "Listening on %s\n", filter_exp);
+  }
 
   fprintf(stderr, "Listening on %s at %s\n", dev, myip);
 
