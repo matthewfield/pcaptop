@@ -1,13 +1,12 @@
 #include <algorithm>
 #include <arpa/inet.h>
-#include <format>
-#include <iostream>
 #include <ncurses.h>
 #include <net/ethernet.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 #include <pcap.h>
+#include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,18 +37,38 @@ bool use_color;
 std::unordered_map<std::string, int> ips;
 std::unordered_map<std::string, int> ignored;
 
+void get_network(char *ip, char *network, int bits = 24) {
+  std::vector<std::string> v;
+  std::stringstream ss(ip);
+  while (ss.good()) {
+    std::string substr;
+    getline(ss, substr, '.');
+    v.push_back(substr);
+  }
+  if (bits == 24) {
+    snprintf(network, 12, "%s.%s.%s", v[0].c_str(), v[1].c_str(), v[2].c_str());
+
+  } else if (bits == 16) {
+    snprintf(network, 7, "%s.%s", v[0].c_str(), v[1].c_str());
+  }
+}
+
 void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
               const u_char *packet) {
 
   char ip[15];
+  char network[12];
 
   snprintf(ip, 15, "%d.%d.%d.%d", packet[26], packet[27], packet[28],
            packet[29]);
 
+  get_network(ip, network, 24);
+
   if (strcmp(ip, myip) == 0)
     return;
 
-  if (ignored.find(ip) == ignored.end()) {
+  if (ignored.find(ip) == ignored.end() &&
+      ignored.find(network) == ignored.end()) {
 
     if (ips.find(ip) == ips.end()) {
       ips[ip] = 1;
@@ -86,11 +105,33 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
     return l.first > r.first;
   });
 
+  // clear any from top that are now covered by net blocks
+  for (auto &top : vec) {
+    char range[12];
+    char rip[15];
+    snprintf(rip, 15, "%s", top.first.c_str());
+    get_network(rip, range, 24);
+    if (ignored.find(range) != ignored.end()) {
+      vec.erase(find(vec.begin(), vec.end(), top));
+    }
+  }
+
+  // loop through the top 10 and display/handle ignore keypresses
   for (int i = 0; i < 10; i++) {
 
-    if (key == 127 && highlight == i) {
-      ignored[vec[i].first] = vec[i].second;
-      ips[vec[i].first] = 0;
+    // clear any that are covered by range
+
+    if ((key == 127 || key == 114) && highlight == i) {
+      if (key == 127) {
+        ignored[vec[i].first] = vec[i].second;
+        ips[vec[i].first] = 0;
+      } else {
+        char range[12];
+        char rip[15];
+        snprintf(rip, 15, "%s", vec[i].first.c_str());
+        get_network(rip, range, 24);
+        ignored[range] = 1;
+      }
       highlight--;
       if (highlight < 0)
         highlight = 0;
@@ -124,6 +165,7 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
 
   c = 13;
 
+  // output ignore list
   for (auto &ig : ignored) {
     mvwprintw(topwin, c, 2, "%15s (%6i)", ig.first.c_str(), ig.second);
     c++;
@@ -149,42 +191,6 @@ int main(int argc, char *argv[]) {
   struct sockaddr_in *ipaddress;
 
   pcap_findalldevs(&alldevsp, errbuf);
-
-  initscr();
-  use_color = has_colors() ? TRUE : FALSE;
-
-  if (use_color) {
-    start_color();
-    init_pair(RED, COLOR_RED, COLOR_BLACK);
-  }
-
-  noecho();
-  cbreak();
-  timeout(100);
-  keypad(stdscr, TRUE);
-  curs_set(0);
-
-  int height, width;
-
-  getmaxyx(stdscr, height, width);
-  refresh();
-  height = 30;
-  titlewin = newwin(3, 64, 1, 1);
-  box(titlewin, 0, 0);
-  mainwin = newwin(height - 4, 32, 4, 1);
-  box(mainwin, 0, 0);
-  scrollwin = newwin(height - 6, 29, 5, 3);
-  topwin = newwin(height - 4, 32, 4, 33);
-  box(topwin, 0, 0);
-  wrefresh(mainwin);
-  mvwprintw(topwin, 12, 12, "Ignored");
-  wrefresh(topwin);
-
-  scrollok(scrollwin, TRUE);
-
-  mvwprintw(titlewin, 1, 13, "Latest");
-  mvwprintw(titlewin, 1, 45, "Top");
-  wrefresh(titlewin);
 
   // if an interface was specified in argv[1] then iterate until we find it,
   // else list all available interfaces
@@ -246,11 +252,51 @@ int main(int argc, char *argv[]) {
               pcap_geterr(handle));
       return (2);
     }
-    fprintf(stderr, "Listening on %s\n", filter_exp);
   }
 
-  fprintf(stderr, "Listening on %s at %s\n", dev, myip);
+  initscr();
+  use_color = has_colors() ? TRUE : FALSE;
 
+  if (use_color) {
+    start_color();
+    init_pair(RED, COLOR_RED, COLOR_BLACK);
+  }
+
+  noecho();
+  cbreak();
+  timeout(100);
+  keypad(stdscr, TRUE);
+  curs_set(0);
+
+  int height, width;
+
+  getmaxyx(stdscr, height, width);
+  refresh();
+  height = 30;
+  titlewin = newwin(4, 64, 1, 1);
+  box(titlewin, 0, 0);
+  mainwin = newwin(height - 5, 32, 5, 1);
+  box(mainwin, 0, 0);
+  scrollwin = newwin(height - 7, 29, 6, 3);
+  topwin = newwin(height - 5, 32, 5, 33);
+  box(topwin, 0, 0);
+  wrefresh(mainwin);
+  mvwprintw(topwin, 12, 12, "Ignored");
+  wrefresh(topwin);
+
+  scrollok(scrollwin, TRUE);
+
+  mvwprintw(titlewin, 2, 13, "Latest");
+  mvwprintw(titlewin, 2, 45, "Top");
+
+  mvwprintw(titlewin, 1, 2, "Listening on %s at %s", dev, myip);
+  if (argv[2]) {
+    mvwprintw(titlewin, 1, 40, "Filtering on %s", filter_exp);
+  }
+
+  wrefresh(titlewin);
+
+  // start the capture loop
   pcap_loop(handle, 0, callback, NULL);
 
   /* And close the session */
