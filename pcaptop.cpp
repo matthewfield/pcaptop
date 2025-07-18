@@ -97,6 +97,23 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
   }
 }
 
+std::vector<pair> sortedVector(std::unordered_map<std::string, int> *map) {
+  std::vector<pair> vec;
+
+  // copy key-value pairs from the map to the vector
+  std::copy(ips.begin(), ips.end(), std::back_inserter<std::vector<pair>>(vec));
+
+  // sort the vector by increasing the order of its pair's second vaLue
+  // if the second value is equal, order by the pair's first value
+  std::sort(vec.begin(), vec.end(), [](const pair &l, const pair &r) {
+    if (l.second != r.second) {
+      return l.second > r.second;
+    }
+    return l.first > r.first;
+  });
+  return vec;
+}
+
 void updateUI() {
   while (true) {
     key = getch();
@@ -119,20 +136,11 @@ void updateUI() {
 
     if (ips.size() > 0) {
 
-      std::vector<pair> vec;
+      std::vector<pair> vec = sortedVector(&ips);
 
-      // copy key-value pairs from the map to the vector
-      std::copy(ips.begin(), ips.end(),
-                std::back_inserter<std::vector<pair>>(vec));
-
-      // sort the vector by increasing the order of its pair's second vaLue
-      // if the second value is equal, order by the pair's first value
-      std::sort(vec.begin(), vec.end(), [](const pair &l, const pair &r) {
-        if (l.second != r.second) {
-          return l.second > r.second;
-        }
-        return l.first > r.first;
-      });
+      if (highlight > vec.size() - 1) {
+        highlight = vec.size() - 1;
+      }
 
       // clear any from top that are now covered by net blocks
       for (const pair &v : vec) {
@@ -148,8 +156,6 @@ void updateUI() {
 
       // loop through the top 10 and display/handle ignore keypresses
       for (int i = 0; i < 10; i++) {
-
-        // clear any that are covered by range
 
         if ((key == KEY_BS || key == KEY_LC_R) && highlight == i) {
           if (key == KEY_BS) {
@@ -168,7 +174,7 @@ void updateUI() {
           key = 0;
         }
 
-        if (vec[i].second == 0 || vec[i].second < 1) {
+        if (i > vec.size() - 1 || vec[i].second == 0 || vec[i].second < 1) {
           for (int j = i; j < 10; j++) {
             mvwprintw(topwin, j + 1, 2, "%28s", " ");
           }
@@ -201,7 +207,7 @@ void updateUI() {
       c++;
     }
     wrefresh(topwin);
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
   }
 }
 
