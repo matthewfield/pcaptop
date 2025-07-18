@@ -23,6 +23,10 @@ typedef std::pair<std::string, int> pair;
 #define PROMISCUOUS 1
 #define NONPROMISCUOUS 0
 #define ETH_ALEN 6
+#define KEY_BS 127
+#define KEY_LC_R 114
+#define KEY_LC_I 105
+#define KEY_LC_C 99
 
 WINDOW *mainwin;
 WINDOW *titlewin;
@@ -53,8 +57,33 @@ void get_network(char *ip, char *network, int bits = 24) {
   }
 }
 
+void clearTopwin() {
+  wclear(topwin);
+  box(topwin, 0, 0);
+  mvwprintw(topwin, 12, 12, "Ignored");
+  wrefresh(topwin);
+}
+
 void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
               const u_char *packet) {
+
+  key = getch();
+  // fprintf(stderr, "%d", key);
+  if (key == KEY_UP) {
+    highlight -= 1;
+    if (highlight < 0)
+      highlight = 0;
+  } else if (key == KEY_DOWN) {
+    highlight += 1;
+    if (highlight > 9)
+      highlight = 9;
+  } else if (key == KEY_LC_C) {
+    ips.clear();
+    clearTopwin();
+  } else if (key == KEY_LC_I) {
+    ignored.clear();
+    clearTopwin();
+  }
 
   char ip[15];
   char network[12];
@@ -79,18 +108,6 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
     wrefresh(scrollwin);
   }
 
-  key = getch();
-  // fprintf(stderr, "%d", key);
-  if (key == KEY_UP) {
-    highlight -= 1;
-    if (highlight < 0)
-      highlight = 0;
-  } else if (key == KEY_DOWN) {
-    highlight += 1;
-    if (highlight > 9)
-      highlight = 9;
-  }
-
   std::vector<pair> vec;
 
   // copy key-value pairs from the map to the vector
@@ -106,13 +123,14 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
   });
 
   // clear any from top that are now covered by net blocks
-  for (auto &top : vec) {
-    char range[12];
-    char rip[15];
-    snprintf(rip, 15, "%s", top.first.c_str());
-    get_network(rip, range, 24);
-    if (ignored.find(range) != ignored.end()) {
-      vec.erase(find(vec.begin(), vec.end(), top));
+  for (const pair &v : vec) {
+    char clearrange[12];
+    char iptoclear[15];
+    snprintf(iptoclear, 15, "%s", v.first.c_str());
+    get_network(iptoclear, clearrange, 24);
+    if (ignored.find(clearrange) != ignored.end()) {
+      vec.erase(find(vec.begin(), vec.end(), v));
+      ips[iptoclear] = 0;
     }
   }
 
@@ -121,16 +139,16 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
 
     // clear any that are covered by range
 
-    if ((key == 127 || key == 114) && highlight == i) {
-      if (key == 127) {
+    if ((key == KEY_BS || key == KEY_LC_R) && highlight == i) {
+      if (key == KEY_BS) {
         ignored[vec[i].first] = vec[i].second;
         ips[vec[i].first] = 0;
-      } else {
+      } else if (key == KEY_LC_R) {
         char range[12];
         char rip[15];
         snprintf(rip, 15, "%s", vec[i].first.c_str());
         get_network(rip, range, 24);
-        ignored[range] = 1;
+        ignored[range] = 0;
       }
       highlight--;
       if (highlight < 0)
@@ -279,10 +297,8 @@ int main(int argc, char *argv[]) {
   box(mainwin, 0, 0);
   scrollwin = newwin(height - 7, 29, 6, 3);
   topwin = newwin(height - 5, 32, 5, 33);
-  box(topwin, 0, 0);
   wrefresh(mainwin);
-  mvwprintw(topwin, 12, 12, "Ignored");
-  wrefresh(topwin);
+  clearTopwin();
 
   scrollok(scrollwin, TRUE);
 
