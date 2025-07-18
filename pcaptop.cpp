@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <arpa/inet.h>
+#include <chrono>
 #include <ncurses.h>
 #include <net/ethernet.h>
 #include <netinet/in.h>
@@ -13,6 +14,7 @@
 #include <string>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <thread>
 #include <unistd.h>
 #include <vector>
 
@@ -64,26 +66,13 @@ void clearTopwin() {
   wrefresh(topwin);
 }
 
+void writeNewPacket(std::string ip, int count) {
+  wprintw(scrollwin, "%15s (%6i)\n", ip.c_str(), ips[ip]);
+  wrefresh(scrollwin);
+}
+
 void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
               const u_char *packet) {
-
-  key = getch();
-  // fprintf(stderr, "%d", key);
-  if (key == KEY_UP) {
-    highlight -= 1;
-    if (highlight < 0)
-      highlight = 0;
-  } else if (key == KEY_DOWN) {
-    highlight += 1;
-    if (highlight > 9)
-      highlight = 9;
-  } else if (key == KEY_LC_C) {
-    ips.clear();
-    clearTopwin();
-  } else if (key == KEY_LC_I) {
-    ignored.clear();
-    clearTopwin();
-  }
 
   char ip[15];
   char network[12];
@@ -104,91 +93,117 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
     } else {
       ips[ip] += 1;
     }
-    wprintw(scrollwin, "%15s (%6i)\n", ip, ips[ip]);
-    wrefresh(scrollwin);
+    writeNewPacket(ip, ips[ip]);
   }
+}
 
-  std::vector<pair> vec;
-
-  // copy key-value pairs from the map to the vector
-  std::copy(ips.begin(), ips.end(), std::back_inserter<std::vector<pair>>(vec));
-
-  // sort the vector by increasing the order of its pair's second vaLue
-  // if the second value is equal, order by the pair's first value
-  std::sort(vec.begin(), vec.end(), [](const pair &l, const pair &r) {
-    if (l.second != r.second) {
-      return l.second > r.second;
-    }
-    return l.first > r.first;
-  });
-
-  // clear any from top that are now covered by net blocks
-  for (const pair &v : vec) {
-    char clearrange[12];
-    char iptoclear[15];
-    snprintf(iptoclear, 15, "%s", v.first.c_str());
-    get_network(iptoclear, clearrange, 24);
-    if (ignored.find(clearrange) != ignored.end()) {
-      vec.erase(find(vec.begin(), vec.end(), v));
-      ips[iptoclear] = 0;
-    }
-  }
-
-  // loop through the top 10 and display/handle ignore keypresses
-  for (int i = 0; i < 10; i++) {
-
-    // clear any that are covered by range
-
-    if ((key == KEY_BS || key == KEY_LC_R) && highlight == i) {
-      if (key == KEY_BS) {
-        ignored[vec[i].first] = vec[i].second;
-        ips[vec[i].first] = 0;
-      } else if (key == KEY_LC_R) {
-        char range[12];
-        char rip[15];
-        snprintf(rip, 15, "%s", vec[i].first.c_str());
-        get_network(rip, range, 24);
-        ignored[range] = 0;
-      }
-      highlight--;
+void updateUI() {
+  while (true) {
+    key = getch();
+    // fprintf(stderr, "%d", key);
+    if (key == KEY_UP) {
+      highlight -= 1;
       if (highlight < 0)
         highlight = 0;
-      key = 0;
+    } else if (key == KEY_DOWN) {
+      highlight += 1;
+      if (highlight > 9)
+        highlight = 9;
+    } else if (key == KEY_LC_C) {
+      ips.clear();
+      clearTopwin();
+    } else if (key == KEY_LC_I) {
+      ignored.clear();
+      clearTopwin();
     }
 
-    if (vec[i].second < 1) {
-      for (int j = i; j < 10; j++) {
-        mvwprintw(topwin, j + 1, 2, "%28s", " ");
+    if (ips.size() > 0) {
+
+      std::vector<pair> vec;
+
+      // copy key-value pairs from the map to the vector
+      std::copy(ips.begin(), ips.end(),
+                std::back_inserter<std::vector<pair>>(vec));
+
+      // sort the vector by increasing the order of its pair's second vaLue
+      // if the second value is equal, order by the pair's first value
+      std::sort(vec.begin(), vec.end(), [](const pair &l, const pair &r) {
+        if (l.second != r.second) {
+          return l.second > r.second;
+        }
+        return l.first > r.first;
+      });
+
+      // clear any from top that are now covered by net blocks
+      for (const pair &v : vec) {
+        char clearrange[12];
+        char iptoclear[15];
+        snprintf(iptoclear, 15, "%s", v.first.c_str());
+        get_network(iptoclear, clearrange, 24);
+        if (ignored.find(clearrange) != ignored.end()) {
+          vec.erase(find(vec.begin(), vec.end(), v));
+          ips[iptoclear] = 0;
+        }
       }
-      wrefresh(topwin);
-      break;
+
+      // loop through the top 10 and display/handle ignore keypresses
+      for (int i = 0; i < 10; i++) {
+
+        // clear any that are covered by range
+
+        if ((key == KEY_BS || key == KEY_LC_R) && highlight == i) {
+          if (key == KEY_BS) {
+            ignored[vec[i].first] = vec[i].second;
+            ips[vec[i].first] = 0;
+          } else if (key == KEY_LC_R) {
+            char range[12];
+            char rip[15];
+            snprintf(rip, 15, "%s", vec[i].first.c_str());
+            get_network(rip, range, 24);
+            ignored[range] = 0;
+          }
+          highlight--;
+          if (highlight < 0)
+            highlight = 0;
+          key = 0;
+        }
+
+        if (vec[i].second == 0 || vec[i].second < 1) {
+          for (int j = i; j < 10; j++) {
+            mvwprintw(topwin, j + 1, 2, "%28s", " ");
+          }
+          wrefresh(topwin);
+          break;
+        }
+
+        if (i == highlight) {
+          wattron(topwin, A_REVERSE);
+        }
+
+        if (use_color && vec[i].second > 1000) {
+          wattron(topwin, COLOR_PAIR(RED));
+          wrefresh(topwin);
+        }
+        mvwprintw(topwin, i + 1, 2, "%15s (%6i)", vec[i].first.c_str(),
+                  vec[i].second);
+
+        if (use_color && vec[i].second > 1000) {
+          wattroff(topwin, COLOR_PAIR(RED));
+        }
+        wattroff(topwin, A_REVERSE);
+      }
     }
 
-    if (i == highlight) {
-      wattron(topwin, A_REVERSE);
-    }
+    c = 13;
 
-    if (use_color && vec[i].second > 1000) {
-      wattron(topwin, COLOR_PAIR(RED));
-      wrefresh(topwin);
+    // output ignore list
+    for (auto &ig : ignored) {
+      mvwprintw(topwin, c, 2, "%15s (%6i)", ig.first.c_str(), ig.second);
+      c++;
     }
-    mvwprintw(topwin, i + 1, 2, "%15s (%6i)", vec[i].first.c_str(),
-              vec[i].second);
-
-    if (use_color && vec[i].second > 1000) {
-      wattroff(topwin, COLOR_PAIR(RED));
-    }
-    wattroff(topwin, A_REVERSE);
+    wrefresh(topwin);
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
   }
-
-  c = 13;
-
-  // output ignore list
-  for (auto &ig : ignored) {
-    mvwprintw(topwin, c, 2, "%15s (%6i)", ig.first.c_str(), ig.second);
-    c++;
-  }
-  wrefresh(topwin);
 }
 
 int main(int argc, char *argv[]) {
@@ -312,11 +327,14 @@ int main(int argc, char *argv[]) {
 
   wrefresh(titlewin);
 
+  std::thread t_updateUI(updateUI);
+
   // start the capture loop
   pcap_loop(handle, 0, callback, NULL);
 
   /* And close the session */
   pcap_close(handle);
   endwin();
+  t_updateUI.join();
   return (0);
 }
