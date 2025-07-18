@@ -67,7 +67,7 @@ void clearTopwin() {
 }
 
 void writeNewPacket(std::string ip, int count) {
-  wprintw(scrollwin, "%15s (%6i)\n", ip.c_str(), ips[ip]);
+  wprintw(scrollwin, "%15s (%6i)\n", ip.c_str(), count);
   wrefresh(scrollwin);
 }
 
@@ -138,10 +138,6 @@ void updateUI() {
 
       std::vector<pair> vec = sortedVector(&ips);
 
-      if (highlight > vec.size() - 1) {
-        highlight = vec.size() - 1;
-      }
-
       // clear any from top that are now covered by net blocks
       for (const pair &v : vec) {
         char clearrange[12];
@@ -152,6 +148,10 @@ void updateUI() {
           vec.erase(find(vec.begin(), vec.end(), v));
           ips[iptoclear] = 0;
         }
+      }
+
+      if (highlight > vec.size() - 1) {
+        highlight = vec.size() - 1;
       }
 
       // loop through the top 10 and display/handle ignore keypresses
