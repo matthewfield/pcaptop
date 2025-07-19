@@ -89,11 +89,6 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
     if (strcmp(ip, myip) == 0)
         return;
 
-    // for (auto &ig : new_ignore) {
-    //     ips[ig.first] = 0;
-    // }
-    // new_ignore.clear();
-
     if (ignored.find(ip) == ignored.end() &&
         ignored.find(network) == ignored.end()) {
 
