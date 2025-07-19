@@ -41,6 +41,9 @@ int key;
 int c;
 char *myip;
 bool use_color;
+bool filtering = false;
+char *dev = NULL;              /* The device to sniff on */
+char filter_exp[10] = "port "; /* The filter expression */
 std::string last_ignored;
 std::unordered_map<std::string, int> ips;
 std::unordered_map<std::string, int> ignored;
@@ -68,6 +71,29 @@ void clearTopwin() {
     box(topwin, 0, 0);
     mvwprintw(topwin, 12, 12, "Ignored");
     wrefresh(topwin);
+}
+
+void redrawUI() {
+    refresh();
+    int height = 30;
+    titlewin = newwin(4, 64, 1, 1);
+    box(titlewin, 0, 0);
+    mainwin = newwin(height - 5, 32, 5, 1);
+    box(mainwin, 0, 0);
+    scrollwin = newwin(height - 7, 28, 6, 4);
+    topwin = newwin(height - 5, 32, 5, 33);
+    wrefresh(mainwin);
+    clearTopwin();
+
+    scrollok(scrollwin, TRUE);
+
+    mvwprintw(titlewin, 2, 13, "Latest");
+    mvwprintw(titlewin, 2, 45, "Top");
+    mvwprintw(titlewin, 1, 2, "Listening on %s at %s", dev, myip);
+    if (filtering) {
+        mvwprintw(titlewin, 1, 40, "Filtering on %s", filter_exp);
+    }
+    wrefresh(titlewin);
 }
 
 void writeNewPacket(std::string ip, int count) {
@@ -141,6 +167,9 @@ void updateUI() {
             ignored.erase(ignored.find(last_ignored));
             last_ignored = "";
             clearTopwin();
+        } else if (key == KEY_RESIZE) {
+            endwin();
+            redrawUI();
         }
 
         if (ips.size() > 0) {
@@ -228,10 +257,8 @@ void updateUI() {
 
 int main(int argc, char *argv[]) {
     pcap_t *handle;                /* Session handle */
-    char *dev = NULL;              /* The device to sniff on */
     char errbuf[PCAP_ERRBUF_SIZE]; /* Error string */
     struct bpf_program fp;         /* The compiled filter */
-    char filter_exp[10] = "port "; /* The filter expression */
     bpf_u_int32 mask;              /* Our netmask */
     bpf_u_int32 net;               /* Our IP */
     struct pcap_pkthdr header;     /* The header that pcap gives us */
@@ -295,6 +322,7 @@ int main(int argc, char *argv[]) {
 
     // if a port was specified in argv[2] then create a filter for it
     if (argv[2]) {
+        filtering = true;
         strcpy(filter_exp, (char *)strcat(filter_exp, argv[2]));
 
         /* Compile and apply the filter */
@@ -324,31 +352,7 @@ int main(int argc, char *argv[]) {
     keypad(stdscr, TRUE);
     curs_set(0);
 
-    int height, width;
-
-    getmaxyx(stdscr, height, width);
-    refresh();
-    height = 30;
-    titlewin = newwin(4, 64, 1, 1);
-    box(titlewin, 0, 0);
-    mainwin = newwin(height - 5, 32, 5, 1);
-    box(mainwin, 0, 0);
-    scrollwin = newwin(height - 7, 28, 6, 4);
-    topwin = newwin(height - 5, 32, 5, 33);
-    wrefresh(mainwin);
-    clearTopwin();
-
-    scrollok(scrollwin, TRUE);
-
-    mvwprintw(titlewin, 2, 13, "Latest");
-    mvwprintw(titlewin, 2, 45, "Top");
-
-    mvwprintw(titlewin, 1, 2, "Listening on %s at %s", dev, myip);
-    if (argv[2]) {
-        mvwprintw(titlewin, 1, 40, "Filtering on %s", filter_exp);
-    }
-
-    wrefresh(titlewin);
+    redrawUI();
 
     std::thread t_updateUI(updateUI);
 
