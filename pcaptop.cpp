@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <arpa/inet.h>
+#include <bitset>
 #include <chrono>
+#include <iostream>
 #include <ncurses.h>
 #include <net/ethernet.h>
 #include <netinet/in.h>
@@ -42,7 +44,7 @@ int c;
 char *myip;
 bool use_color;
 bool filtering = false;
-bool syn = false;
+bool syn_only = false;
 char *dev = NULL;              /* The device to sniff on */
 char filter_exp[10] = "port "; /* The filter expression */
 char syn_exp[45] =
@@ -97,15 +99,18 @@ void redrawUI() {
     if (filtering) {
         mvwprintw(titlewin, 1, 35, "Filter: %s", filter_exp);
     }
-    if (syn) {
+    if (syn_only) {
         mvwprintw(titlewin, 1, 53, "SYN only");
     }
     wrefresh(titlewin);
 }
 
-void writeNewPacket(std::string ip, int count) {
-    wprintw(scrollwin, "%15s (%6i)\n", ip.c_str(), count);
-    // wrefresh(scrollwin);
+void writeNewPacket(std::string ip, int count, bool syn = false) {
+    std::string s = "";
+    if (syn) {
+        s = "S";
+    }
+    wprintw(scrollwin, "%15s (%6i) %s\n", ip.c_str(), count, s.c_str());
 }
 
 void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
@@ -113,9 +118,17 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
 
     char ip[15];
     char network[12];
+    bool syn = false;
 
     snprintf(ip, 15, "%d.%d.%d.%d", packet[26], packet[27], packet[28],
              packet[29]);
+
+    if (!syn_only) {
+        std::bitset<8> flags(packet[47]);
+        if (flags[1]) {
+            syn = true;
+        }
+    }
 
     get_network(ip, network, 24);
 
@@ -130,7 +143,7 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
         } else {
             ips[ip] += 1;
         }
-        writeNewPacket(ip, ips[ip]);
+        writeNewPacket(ip, ips[ip], syn);
     }
 }
 
@@ -345,7 +358,7 @@ int main(int argc, char *argv[]) {
         }
     }
     if (argv[3]) {
-        syn = true;
+        syn_only = true;
         if (pcap_compile(handle, &fp, syn_exp, 0, net) == -1) {
             fprintf(stderr, "Couldn't parse filter %s: %s\n", syn_exp,
                     pcap_geterr(handle));
