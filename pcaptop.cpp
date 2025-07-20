@@ -23,6 +23,7 @@
 typedef std::pair<std::string, int> pair;
 
 #define RED 1
+#define YELLOW 2
 
 #define PROMISCUOUS 1
 #define NONPROMISCUOUS 0
@@ -108,9 +109,14 @@ void redrawUI() {
 void writeNewPacket(std::string ip, int count, bool syn = false) {
     std::string s = "";
     if (syn) {
-        s = "S";
+        if (use_color) {
+            wattron(scrollwin, COLOR_PAIR(YELLOW));
+        } else {
+            s = "S";
+        }
     }
     wprintw(scrollwin, "%15s (%6i) %s\n", ip.c_str(), count, s.c_str());
+    wattroff(scrollwin, COLOR_PAIR(YELLOW));
 }
 
 void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
@@ -377,6 +383,7 @@ int main(int argc, char *argv[]) {
     if (use_color) {
         start_color();
         init_pair(RED, COLOR_RED, COLOR_BLACK);
+        init_pair(YELLOW, COLOR_YELLOW, COLOR_BLACK);
     }
 
     noecho();
