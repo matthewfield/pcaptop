@@ -42,8 +42,12 @@ int c;
 char *myip;
 bool use_color;
 bool filtering = false;
+bool syn = false;
 char *dev = NULL;              /* The device to sniff on */
 char filter_exp[10] = "port "; /* The filter expression */
+char syn_exp[45] =
+    "tcp[tcpflags] & (tcp-syn|tcp-ack) == tcp-syn"; /* The SYN filter expression
+                                                     */
 std::string last_ignored;
 std::unordered_map<std::string, int> ips;
 std::unordered_map<std::string, int> ignored;
@@ -89,9 +93,12 @@ void redrawUI() {
 
     mvwprintw(titlewin, 2, 13, "Latest");
     mvwprintw(titlewin, 2, 45, "Top");
-    mvwprintw(titlewin, 1, 2, "Listening on %s at %s", dev, myip);
+    mvwprintw(titlewin, 1, 2, "Listen on %s at %s", dev, myip);
     if (filtering) {
-        mvwprintw(titlewin, 1, 40, "Filtering on %s", filter_exp);
+        mvwprintw(titlewin, 1, 35, "Filter: %s", filter_exp);
+    }
+    if (syn) {
+        mvwprintw(titlewin, 1, 53, "SYN only");
     }
     wrefresh(titlewin);
 }
@@ -333,6 +340,19 @@ int main(int argc, char *argv[]) {
         }
         if (pcap_setfilter(handle, &fp) == -1) {
             fprintf(stderr, "Couldn't install filter %s: %s\n", filter_exp,
+                    pcap_geterr(handle));
+            return (2);
+        }
+    }
+    if (argv[3]) {
+        syn = true;
+        if (pcap_compile(handle, &fp, syn_exp, 0, net) == -1) {
+            fprintf(stderr, "Couldn't parse filter %s: %s\n", syn_exp,
+                    pcap_geterr(handle));
+            return (2);
+        }
+        if (pcap_setfilter(handle, &fp) == -1) {
+            fprintf(stderr, "Couldn't install filter %s: %s\n", syn_exp,
                     pcap_geterr(handle));
             return (2);
         }
