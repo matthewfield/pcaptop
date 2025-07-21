@@ -1,8 +1,8 @@
+#include "cargs.h"
 #include <algorithm>
 #include <arpa/inet.h>
 #include <bitset>
 #include <chrono>
-#include <iostream>
 #include <ncurses.h>
 #include <net/ethernet.h>
 #include <netinet/in.h>
@@ -33,6 +33,27 @@ typedef std::pair<std::string, int> pair;
 #define KEY_LC_I 105
 #define KEY_LC_R 114
 #define KEY_LC_U 117
+
+static struct cag_option options[] = {
+    {.identifier = 'i',
+     .access_letters = "i",
+     .access_name = "interface",
+     .value_name = "VALUE",
+     .description = "The interface to capture on"},
+    {.identifier = 'p',
+     .access_letters = "p",
+     .access_name = "port",
+     .value_name = "VALUE",
+     .description = "Filter traffic to port"},
+    {.identifier = 's',
+     .access_letters = "s",
+     .access_name = "syn",
+     .value_name = NULL,
+     .description = "Filter SYN only"},
+    {.identifier = 'h',
+     .access_letters = "h?",
+     .access_name = "help",
+     .description = "Shows the command help"}};
 
 WINDOW *mainwin;
 WINDOW *titlewin;
@@ -298,9 +319,34 @@ int main(int argc, char *argv[]) {
 
     pcap_findalldevs(&alldevsp, errbuf);
 
-    // if an interface was specified in argv[1] then iterate until we find it,
-    // else list all available interfaces
-    if (!argv[1]) {
+    const char *requested_interface = NULL;
+    const char *requested_port = NULL;
+
+    cag_option_context context;
+    cag_option_init(&context, options, CAG_ARRAY_SIZE(options), argc, argv);
+    while (cag_option_fetch(&context)) {
+        switch (cag_option_get_identifier(&context)) {
+        case 'i':
+            requested_interface = cag_option_get_value(&context);
+            break;
+        case 'p':
+            requested_port = cag_option_get_value(&context);
+            break;
+        case 's':
+            syn_only = true;
+            break;
+        case 'h':
+            printf("Usage: pcaptop [OPTION]...\n");
+            cag_option_print(options, CAG_ARRAY_SIZE(options), stdout);
+            return EXIT_SUCCESS;
+        case '?':
+            cag_option_print_error(&context, stdout);
+            break;
+        }
+    }
+    // if an interface was specified in argv[1] then iterate until we find
+    // it, else list all available interfaces
+    if (!requested_interface) {
 
         for (interface = alldevsp; interface != NULL;
              interface = interface->next) {
@@ -313,7 +359,7 @@ int main(int argc, char *argv[]) {
         for (interface = alldevsp; interface != NULL;
              interface = interface->next) {
 
-            if (strcmp(interface->name, argv[1]) == 0) {
+            if (strcmp(interface->name, requested_interface) == 0) {
                 dev = interface->name;
                 fprintf(stderr, "Device found: %s\n", dev);
                 for (address = interface->addresses; address != NULL;
@@ -347,9 +393,9 @@ int main(int argc, char *argv[]) {
     }
 
     // if a port was specified in argv[2] then create a filter for it
-    if (argv[2]) {
+    if (requested_port) {
         filtering = true;
-        strcpy(filter_exp, (char *)strcat(filter_exp, argv[2]));
+        strcpy(filter_exp, (char *)strcat(filter_exp, requested_port));
 
         /* Compile and apply the filter */
         if (pcap_compile(handle, &fp, filter_exp, 0, net) == -1) {
@@ -363,8 +409,7 @@ int main(int argc, char *argv[]) {
             return (2);
         }
     }
-    if (argv[3]) {
-        syn_only = true;
+    if (syn_only) {
         if (pcap_compile(handle, &fp, syn_exp, 0, net) == -1) {
             fprintf(stderr, "Couldn't parse filter %s: %s\n", syn_exp,
                     pcap_geterr(handle));
