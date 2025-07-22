@@ -20,8 +20,6 @@
 #include <unistd.h>
 #include <vector>
 
-typedef std::pair<std::string, int> pair;
-
 #define RED 1
 #define YELLOW 2
 
@@ -72,27 +70,30 @@ char filter_exp[10] = "port "; /* The filter expression */
 char syn_exp[45] =
     "tcp[tcpflags] & (tcp-syn|tcp-ack) == tcp-syn"; /* The SYN filter expression
                                                      */
-std::string last_ignored;
-std::unordered_map<std::string, int> ips;
-std::unordered_map<std::string, int> ignored;
-std::unordered_map<std::string, int> new_ignore;
 
-void get_network(char *ip, char *network, int bits = 24) {
-    std::vector<std::string> v;
-    std::stringstream ss(ip);
-    while (ss.good()) {
-        std::string substr;
-        getline(ss, substr, '.');
-        v.push_back(substr);
-    }
-    if (bits == 24) {
-        snprintf(network, 12, "%s.%s.%s", v[0].c_str(), v[1].c_str(),
-                 v[2].c_str());
+typedef std::array<unsigned int, 4> ipv4;
+typedef std::pair<ipv4, int> pair;
 
-    } else if (bits == 16) {
-        snprintf(network, 7, "%s.%s", v[0].c_str(), v[1].c_str());
+struct ArrayHasher {
+    std::size_t operator()(const ipv4 &a) const {
+        std::size_t h = 0;
+
+        for (auto e : a) {
+            h ^= std::hash<int>{}(e) + 0x9e3779b9 + (h << 6) + (h >> 2);
+        }
+        return h;
     }
-}
+};
+
+struct ArrayEquality {
+    bool operator()(ipv4 a, ipv4 b) const {
+        return std::equal(a.begin(), a.end(), b.begin());
+    }
+};
+
+ipv4 last_ignored;
+std::unordered_map<ipv4, int, ArrayHasher, ArrayEquality> ips;
+std::unordered_map<ipv4, int, ArrayHasher, ArrayEquality> ignored;
 
 void clearTopwin() {
     wclear(topwin);
@@ -127,7 +128,7 @@ void redrawUI() {
     wrefresh(titlewin);
 }
 
-void writeNewPacket(std::string ip, int count, bool syn = false) {
+void writeNewPacket(ipv4 ip, int count, bool syn = false) {
     std::string s = "";
     if (syn) {
         if (use_color) {
@@ -136,19 +137,41 @@ void writeNewPacket(std::string ip, int count, bool syn = false) {
             s = "S";
         }
     }
-    wprintw(scrollwin, "%15s (%6i) %s\n", ip.c_str(), count, s.c_str());
+    wprintw(scrollwin, "%3d.%3d.%3d.%3d  (%7i) %s\n", ip[0], ip[1], ip[2],
+            ip[3], count, s.c_str());
     wattroff(scrollwin, COLOR_PAIR(YELLOW));
+}
+
+std::string ipToString(ipv4 ip) {
+    std::string ip_str = std::to_string(ip[0]) + "." + std::to_string(ip[1]) +
+                         "." + std::to_string(ip[2]) + "." +
+                         std::to_string(ip[3]);
+    return ip_str;
+}
+
+ipv4 ipFromString(std::string ip) {
+    std::vector<unsigned int> octets;
+    std::stringstream ss(ip);
+    while (ss.good()) {
+        std::string octet;
+        getline(ss, octet, '.');
+        octets.push_back(std::stoul(octet));
+    }
+    ipv4 network = {octets[0], octets[1], octets[2], octets[3]};
+    return network;
 }
 
 void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
               const u_char *packet) {
 
-    char ip[15];
+    char ip_str[15];
     char network[12];
     bool syn = false;
 
-    snprintf(ip, 15, "%d.%d.%d.%d", packet[26], packet[27], packet[28],
-             packet[29]);
+    ipv4 ip = {packet[26], packet[27], packet[28], packet[29]};
+    ipv4 net = {ip[0], ip[1], ip[2], 0};
+
+    snprintf(ip_str, 15, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
 
     if (!syn_only) {
         std::bitset<8> flags(packet[47]);
@@ -157,14 +180,16 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
         }
     }
 
-    get_network(ip, network, 24);
-
-    if (strcmp(ip, myip) == 0)
+    if (strcmp(ip_str, myip) == 0)
         return;
 
-    if (ignored.find(ip) == ignored.end() &&
-        ignored.find(network) == ignored.end()) {
+    if (ignored.find(net) != ignored.end() ||
+        ignored.find(ip) != ignored.end()) {
 
+        ips[ip] = 0;
+        ips.erase(ip);
+
+    } else {
         if (ips.find(ip) == ips.end()) {
             ips[ip] = 1;
         } else {
@@ -174,7 +199,8 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
     }
 }
 
-std::vector<pair> sortedVector(std::unordered_map<std::string, int> *map) {
+std::vector<pair>
+sortedVector(std::unordered_map<ipv4, int, ArrayHasher, ArrayEquality> *map) {
     std::vector<pair> vec;
 
     // copy key-value pairs from the map to the vector
@@ -210,9 +236,9 @@ void updateUI() {
         } else if (key == KEY_LC_I) {
             ignored.clear();
             clearTopwin();
-        } else if (key == KEY_LC_U && last_ignored != "") {
+        } else if (key == KEY_LC_U && last_ignored.size() > 0) {
             ignored.erase(ignored.find(last_ignored));
-            last_ignored = "";
+            last_ignored = {};
             clearTopwin();
         } else if (key == KEY_RESIZE) {
             endwin();
@@ -225,14 +251,10 @@ void updateUI() {
 
             // clear any from top that are now covered by net blocks
             for (const pair &v : vec) {
-                char clearrange[12];
-                char iptoclear[15];
-                snprintf(iptoclear, 15, "%s", v.first.c_str());
-                get_network(iptoclear, clearrange, 24);
-                if (ignored.find(clearrange) != ignored.end()) {
-                    vec.erase(find(vec.begin(), vec.end(), v));
-                    // new_ignore[iptoclear] = 0;
-                    ips[iptoclear] = 0;
+                ipv4 ipnet = {v.first[0], v.first[1], v.first[2], 0};
+                if (ignored.find(ipnet) != ignored.end()) {
+                    ips[v.first] = 0;
+                    ips.erase(v.first);
                 }
             }
 
@@ -245,25 +267,6 @@ void updateUI() {
             // loop through the top 10 and display/handle ignore keypresses
             for (int i = 0; i < 10; i++) {
 
-                if ((key == KEY_BS || key == KEY_LC_R) && highlight == i) {
-                    if (key == KEY_BS) {
-                        ignored[vec[i].first] = vec[i].second;
-                        ips[vec[i].first] = 0;
-                        last_ignored = vec[i].first;
-                    } else if (key == KEY_LC_R) {
-                        char range[12];
-                        char rip[15];
-                        snprintf(rip, 15, "%s", vec[i].first.c_str());
-                        get_network(rip, range, 24);
-                        ignored[range] = 0;
-                        last_ignored = range;
-                    }
-                    highlight--;
-                    if (highlight < 0)
-                        highlight = 0;
-                    key = 0;
-                }
-
                 // if we are past the top vector length then continue to line 10
                 // with blank to overwrite
                 if (i > vec.size() - 1 || vec[i].second < 1) {
@@ -274,6 +277,23 @@ void updateUI() {
                     break;
                 }
 
+                if ((key == KEY_BS || key == KEY_LC_R) && highlight == i) {
+                    if (key == KEY_BS) {
+                        ignored[vec[i].first] = vec[i].second;
+                        ips[vec[i].first] = 0;
+                        last_ignored = vec[i].first;
+                    } else if (key == KEY_LC_R) {
+                        ipv4 range = {vec[i].first[0], vec[i].first[1],
+                                      vec[i].first[2], 0};
+                        ignored[range] = 0;
+                        last_ignored = range;
+                    }
+                    highlight--;
+                    if (highlight < 0)
+                        highlight = 0;
+                    key = 0;
+                }
+
                 if (i == highlight) {
                     wattron(topwin, A_REVERSE);
                 }
@@ -282,8 +302,9 @@ void updateUI() {
                     wattron(topwin, COLOR_PAIR(RED));
                 }
 
-                mvwprintw(topwin, i + 1, 3, "%15s (%6i)", vec[i].first.c_str(),
-                          vec[i].second);
+                mvwprintw(topwin, i + 1, 3, "%3d.%3d.%3d.%3d  (%7d)",
+                          vec[i].first[0], vec[i].first[1], vec[i].first[2],
+                          vec[i].first[3], vec[i].second);
 
                 wattroff(topwin, COLOR_PAIR(RED));
                 wattroff(topwin, A_REVERSE);
@@ -294,11 +315,12 @@ void updateUI() {
 
         // output ignore list
         for (auto &ig : ignored) {
-            mvwprintw(topwin, c, 3, "%15s (%6i)", ig.first.c_str(), ig.second);
+            mvwprintw(topwin, c, 3, "%3d.%3d.%3d.%3d  (%7d)", ig.first[0],
+                      ig.first[1], ig.first[2], ig.first[3], ig.second);
             c++;
         }
         wrefresh(topwin);
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 }
 
