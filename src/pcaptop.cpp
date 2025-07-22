@@ -58,19 +58,6 @@ WINDOW *titlewin;
 WINDOW *scrollwin;
 WINDOW *topwin;
 
-int highlight = 0;
-int key;
-int c;
-char *myip;
-bool use_color;
-bool filtering = false;
-bool syn_only = false;
-char *dev = NULL;              /* The device to sniff on */
-char filter_exp[10] = "port "; /* The filter expression */
-char syn_exp[45] =
-    "tcp[tcpflags] & (tcp-syn|tcp-ack) == tcp-syn"; /* The SYN filter expression
-                                                     */
-
 typedef std::array<unsigned int, 4> ipv4;
 typedef std::pair<ipv4, int> pair;
 
@@ -94,6 +81,19 @@ struct ArrayEquality {
 ipv4 last_ignored;
 std::unordered_map<ipv4, int, ArrayHasher, ArrayEquality> ips;
 std::unordered_map<ipv4, int, ArrayHasher, ArrayEquality> ignored;
+
+int highlight = 0;
+ipv4 *highlit;
+int key;
+int c;
+char *myip;
+bool use_color;
+bool filtering = false;
+bool syn_only = false;
+char *dev = NULL;              /* The device to sniff on */
+char filter_exp[10] = "port "; /* The filter expression */
+char syn_exp[45] =
+    "tcp[tcpflags] & (tcp-syn|tcp-ack) == tcp-syn"; /* SYN filter expression */
 
 void clearTopwin() {
     wclear(topwin);
@@ -236,7 +236,7 @@ void updateUI() {
         } else if (key == KEY_LC_I) {
             ignored.clear();
             clearTopwin();
-        } else if (key == KEY_LC_U && last_ignored.size() > 0) {
+        } else if (key == KEY_LC_U && last_ignored[0] > 0) {
             ignored.erase(ignored.find(last_ignored));
             last_ignored = {};
             clearTopwin();
@@ -328,7 +328,7 @@ void updateUI() {
             c++;
         }
         wrefresh(topwin);
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
 }
 
