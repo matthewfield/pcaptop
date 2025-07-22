@@ -316,11 +316,14 @@ void updateUI() {
         // output ignore list
         for (auto &ig : ignored) {
             if (ig.first[3] == 0) {
-                mvwprintw(topwin, c, 3, "%3d.%3d.%3d.%3d /24", ig.first[0],
+                mvwprintw(topwin, c, 3, "%3d.%3d.%3d.%3d /24  ", ig.first[0],
                           ig.first[1], ig.first[2], ig.first[3]);
             } else {
-                mvwprintw(topwin, c, 3, "%3d.%3d.%3d.%3d    ", ig.first[0],
+                mvwprintw(topwin, c, 3, "%3d.%3d.%3d.%3d      ", ig.first[0],
                           ig.first[1], ig.first[2], ig.first[3]);
+            }
+            if (last_ignored == ig.first) {
+                mvwprintw(topwin, c, 23, "u");
             }
             c++;
         }
