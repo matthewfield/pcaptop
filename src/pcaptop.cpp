@@ -276,7 +276,11 @@ void updateUI() {
 
             wrefresh(scrollwin);
 
-            int line = 1;
+            for (int j = 2; j < 12; j++) {
+                mvwprintw(topwin, j, 3, "%28s", " ");
+            }
+            wrefresh(topwin);
+
             // loop through the top 10 and display/handle ignore keypresses
             for (int i = 0; i < 10; i++) {
 
@@ -287,11 +291,7 @@ void updateUI() {
                 // if we are past the top vector length then continue to
                 // line 10 with blank to overwrite
                 if (i > vec.size() - 1 || vec[i].second < 1) {
-                    for (int j = line; j < 11; j++) {
-                        mvwprintw(topwin, j, 3, "%28s", " ");
-                    }
-                    wrefresh(topwin);
-                    break;
+                    continue;
                 }
 
                 if ((key == KEY_BS || key == KEY_LC_R) && highlight == i) {
@@ -319,15 +319,14 @@ void updateUI() {
                     wattron(topwin, COLOR_PAIR(RED));
                 }
 
-                mvwprintw(topwin, line, 3, "%3d.%3d.%3d.%3d  (%7d)",
+                mvwprintw(topwin, i + 1, 3, "%3d.%3d.%3d.%3d  (%7d)",
                           vec[i].first[0], vec[i].first[1], vec[i].first[2],
                           vec[i].first[3], vec[i].second);
 
                 wattroff(topwin, COLOR_PAIR(RED));
                 wattroff(topwin, A_REVERSE);
-
-                line++;
             }
+            wrefresh(topwin);
         }
 
         // output ignore list
