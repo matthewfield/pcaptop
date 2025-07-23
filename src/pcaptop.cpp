@@ -278,15 +278,11 @@ void updateUI() {
 
             int i = 0;
 
-            for (int line = 1; line < 12; line++) {
+            for (int line = 1; line < 11; line++) {
                 mvwprintw(topwin, line, 3, "%28s", " ");
 
-                if (i > vec.size() - 1 || vec[i].second < 1) {
-                    i++;
-                    continue;
-                }
-
-                while (ipIsIgnored(vec[i].first)) {
+                if (i > vec.size() - 1 || vec[i].second < 1 ||
+                    ipIsIgnored(vec[i].first)) {
                     i++;
                     continue;
                 }
