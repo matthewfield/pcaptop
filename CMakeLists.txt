@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 4.0.0)
 project(pcaptop)
 add_executable(pcaptop src/pcaptop.cpp src/cargs.c)
-set_property(TARGET pcaptop PROPERTY CXX_STANDARD 17)
+set_property(TARGET pcaptop PROPERTY CXX_STANDARD 23)
 
 # Replace your_path_to_cargs with the path to your cargs copy. 
 # This could be something like "${CMAKE_CURRENT_SOURCE_DIR}/lib/cargs".

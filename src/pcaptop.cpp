@@ -3,6 +3,9 @@
 #include <arpa/inet.h>
 #include <bitset>
 #include <chrono>
+#include <ctime>
+#include <fstream>
+#include <iostream>
 #include <ncurses.h>
 #include <net/ethernet.h>
 #include <netinet/in.h>
@@ -18,6 +21,7 @@
 #include <sys/types.h>
 #include <thread>
 #include <unistd.h>
+#include <unordered_map>
 #include <vector>
 
 #define RED 1
@@ -33,6 +37,11 @@
 #define KEY_LC_U 117
 
 static struct cag_option options[] = {
+    {.identifier = 'f',
+     .access_letters = "f",
+     .access_name = "file",
+     .value_name = "VALUE",
+     .description = "File to output to"},
     {.identifier = 'i',
      .access_letters = "i",
      .access_name = "interface",
@@ -91,6 +100,8 @@ bool use_color;
 bool ignored_need_clearing = false;
 bool filtering = false;
 bool syn_only = false;
+bool file_output = false;
+std::ofstream file;
 char *dev = NULL;              /* The device to sniff on */
 char filter_exp[10] = "port "; /* The filter expression */
 char syn_exp[45] =
@@ -141,6 +152,15 @@ void writeNewPacket(ipv4 ip, int count, bool syn = false) {
     wprintw(scrollwin, "%3d.%3d.%3d.%3d  (%7i) %s\n", ip[0], ip[1], ip[2],
             ip[3], count, s.c_str());
     wattroff(scrollwin, COLOR_PAIR(YELLOW));
+    if (file_output) {
+        std::time_t t = std::time(nullptr);
+        std::string timestamp = std::asctime(std::localtime(&t));
+        timestamp.pop_back();
+        std::cout << timestamp << " | " << ip[0] << "." << ip[1] << "." << ip[2]
+                  << "." << ip[3] << " | " << count << " | " << (syn ? "S" : "")
+                  << std::endl;
+        std::cout.flush();
+    }
 }
 
 std::string ipToString(ipv4 ip) {
@@ -367,11 +387,25 @@ int main(int argc, char *argv[]) {
 
     const char *requested_interface = NULL;
     const char *requested_port = NULL;
+    const char *requested_file = NULL;
 
     cag_option_context context;
     cag_option_init(&context, options, CAG_ARRAY_SIZE(options), argc, argv);
     while (cag_option_fetch(&context)) {
         switch (cag_option_get_identifier(&context)) {
+        case 'f':
+            requested_file = cag_option_get_value(&context);
+            if (!requested_file) {
+                printf("No filename specified\n");
+                return EXIT_SUCCESS;
+            } else {
+                file.open(requested_file);
+                std::streambuf *cout_buf = std::cout.rdbuf();
+                std::streambuf *file_buf = file.rdbuf();
+                std::cout.rdbuf(file_buf);
+                file_output = true;
+                break;
+            }
         case 'i':
             requested_interface = cag_option_get_value(&context);
             break;
@@ -493,6 +527,9 @@ int main(int argc, char *argv[]) {
     /* And close the session */
     pcap_close(handle);
     endwin();
+    if (file_output) {
+        file.close();
+    }
     t_updateUI.join();
     return (0);
 }
