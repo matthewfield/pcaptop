@@ -29,7 +29,7 @@
 
 #define PROMISCUOUS 1
 #define NONPROMISCUOUS 0
-#define ETH_ALEN 6
+
 #define KEY_BS 127
 #define KEY_LC_C 99
 #define KEY_LC_I 105
@@ -86,7 +86,6 @@ std::unordered_map<ipv4, int, ArrayHasher> ips;
 std::unordered_map<ipv4, int, ArrayHasher> ignored;
 
 int highlight = 0;
-ipv4 *highlit;
 int key;
 int c;
 char *myip;
@@ -96,8 +95,8 @@ bool filtering = false;
 bool syn_only = false;
 bool file_output = false;
 std::ofstream file;
-char *dev = NULL;              /* The device to sniff on */
-char filter_exp[10] = "port "; /* The filter expression */
+char *dev = NULL;
+char filter_exp[10] = "port "; /* port filter expression */
 char syn_exp[45] =
     "tcp[tcpflags] & (tcp-syn|tcp-ack) == tcp-syn"; /* SYN filter expression */
 
@@ -249,7 +248,6 @@ sortedVector(std::unordered_map<ipv4, int, ArrayHasher> *map) {
 
 void handleKeys() {
     key = getch();
-    // fprintf(stderr, "%d", key);
     if (key == KEY_UP) {
         highlight -= 1;
         if (highlight < 0)
