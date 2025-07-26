@@ -81,15 +81,9 @@ struct ArrayHasher {
     }
 };
 
-struct ArrayEquality {
-    bool operator()(ipv4 a, ipv4 b) const {
-        return std::equal(a.begin(), a.end(), b.begin());
-    }
-};
-
 ipv4 last_ignored;
-std::unordered_map<ipv4, int, ArrayHasher, ArrayEquality> ips;
-std::unordered_map<ipv4, int, ArrayHasher, ArrayEquality> ignored;
+std::unordered_map<ipv4, int, ArrayHasher> ips;
+std::unordered_map<ipv4, int, ArrayHasher> ignored;
 
 int highlight = 0;
 ipv4 *highlit;
@@ -235,7 +229,7 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
 }
 
 std::vector<pair>
-sortedVector(std::unordered_map<ipv4, int, ArrayHasher, ArrayEquality> *map) {
+sortedVector(std::unordered_map<ipv4, int, ArrayHasher> *map) {
     std::vector<pair> vec;
 
     // copy key-value pairs from the map to the vector
