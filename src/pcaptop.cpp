@@ -58,7 +58,7 @@ static struct cag_option options[] = {
      .value_name = NULL,
      .description = "Filter SYN only"},
     {.identifier = 'h',
-     .access_letters = "h?",
+     .access_letters = "h",
      .access_name = "help",
      .description = "Shows the command help"}};
 
@@ -411,9 +411,6 @@ int main(int argc, char *argv[]) {
             printf("Usage: pcaptop [OPTION]...\n");
             cag_option_print(options, CAG_ARRAY_SIZE(options), stdout);
             return EXIT_SUCCESS;
-        case '?':
-            cag_option_print_error(&context, stdout);
-            break;
         }
     }
     // if an interface was specified in argv[1] then iterate until we find
