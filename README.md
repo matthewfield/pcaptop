@@ -15,9 +15,9 @@ Filtered packet output from the left pane can optionally be sent concurrently to
 * C - clear top list
 * A - clear ignore list
 
-C++23, Dependencies: pcap, ncurses. Builds on OSX and Linux.
+C++23, Dependencies: libpcap-dev, libncurses-dev. Builds on OSX and Linux.
 
-## Installation:
+## Installation
 
 ```console
 git clone https://github.com/matthewfield/pcaptop
@@ -37,7 +37,23 @@ or gcc
 g++ src/pcaptop.cpp src/cargs.c src/cargs.h pcaptop -lncurses -lpcap
 ```
 
-## Screenshots etc.
+## Usage
+
+Needs to be run with sudo to capture traffic. 
+
+```console
+sudo ./pcaptop -i en0
+```
+
+Only required option is -i for interface. Running the bare pcaptop command will list available interfaces.
+
+Alternately - capture from en0, filtering only port 443 traffic, and log to output.txt at the same time.
+
+```console
+sudo ./pcaptop -i en0 -p 443 -f output.txt
+```
+
+## Screenshots etc
 
 ![Command line options](screenshots/pcaptop_command.png?raw=true)
 
