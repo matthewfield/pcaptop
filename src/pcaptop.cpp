@@ -34,6 +34,7 @@
 #define KEY_LC_C 99
 #define KEY_LC_I 105
 #define KEY_LC_N 110
+#define KEY_LC_Q 113
 #define KEY_LC_U 117
 
 static struct cag_option options[] = {
@@ -88,6 +89,8 @@ std::unordered_map<ipv4, int, ArrayHasher> ignored;
 int highlight = 0;
 int key;
 int c;
+std::thread::id uiThreadId;
+pcap_t *handle; /* Session handle */
 char *myip;
 bool use_color;
 bool ignored_need_clearing = false;
@@ -246,7 +249,9 @@ sortedVector(std::unordered_map<ipv4, int, ArrayHasher> *map) {
     return vec;
 }
 
-void handleKeys() {
+void stopCapture() { pcap_breakloop(handle); }
+
+int handleKeys() {
     key = getch();
     if (key == KEY_UP) {
         highlight -= 1;
@@ -266,17 +271,22 @@ void handleKeys() {
         ignored.erase(ignored.find(last_ignored));
         last_ignored = {};
         clearTopwin();
+    } else if (key == KEY_LC_Q) {
+        stopCapture();
+        return 0;
     } else if (key == KEY_RESIZE) {
         endwin();
         redrawUI();
     }
+    return 1;
 }
 
 void updateUI() {
 
     while (true) {
 
-        handleKeys();
+        if (!handleKeys())
+            break;
 
         if (ips.size() > 0) {
 
@@ -361,7 +371,6 @@ void updateUI() {
 }
 
 int main(int argc, char *argv[]) {
-    pcap_t *handle;                /* Session handle */
     char errbuf[PCAP_ERRBUF_SIZE]; /* Error string */
     struct bpf_program fp;         /* The compiled filter */
     bpf_u_int32 mask;              /* Our netmask */
@@ -509,16 +518,23 @@ int main(int argc, char *argv[]) {
     redrawUI();
 
     std::thread t_updateUI(updateUI);
+    uiThreadId = t_updateUI.get_id();
+
+    pcap_set_timeout(handle, 1000);
+    pcap_set_immediate_mode(handle, 1);
 
     // start the capture loop
     pcap_loop(handle, 0, callback, NULL);
 
-    /* And close the session */
-    pcap_close(handle);
+    // stopCapture();
     endwin();
     if (file_output) {
         file.close();
     }
     t_updateUI.join();
+
+    pcap_close(handle);
+
+    /* And close the session */
     return (0);
 }
