@@ -1,7 +1,7 @@
 # pcaptop
 
 ## Introduction
-An ncurses based terminal command for displaying top inbound connections to a selected network interface using libpcap. Created when i needed a lightweight solution to use over SSH to be able to watch a server for SYN DoS attacks in real time.
+An ncurses based terminal command for displaying top inbound connections to a selected network interface using libpcap. Created when i needed a lightweight solution to use over SSH to be able to watch a server for SYN Flood DoS attacks in real time.
 
 Individual IPs, or /24 networks can be ignored
 
@@ -15,7 +15,7 @@ Filtered packet output from the left pane can optionally be sent concurrently to
 * C - clear top list
 * A - clear ignore list
 
-C++23, Dependencies: libpcap-dev, libncurses-dev. Builds on OSX and Linux.
+C++17, Dependencies: libpcap-dev, libncurses-dev. Builds on OSX and Linux.
 
 ## Installation
 
