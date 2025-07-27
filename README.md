@@ -7,19 +7,36 @@ Individual IPs, or /24 networks can be ignored
 
 Filtered packet output from the left pane can optionally be sent concurrently to a log file with timestamps.
 
-C++23, Dependencies: pcap, ncurses
+Keys:
+Up/down - select from top list 
+I - ignore IP
+N - ignore /24
+U - undo last ignored
+C - clear top list
+A - clear ignore list
+
+C++23, Dependencies: pcap, ncurses. Builds on OSX and Linux.
 
 ## Installation:
 
 ```console
 git clone https://github.com/matthewfield/pcaptop
 cd pcaptop
+
+```
+then with CMake
+
+```console
 cmake .
 make
 ```
+
+or gcc
+```console
+
+g++ src/pcaptop.cpp src/cargs.c src/cargs.h pcaptop -lncurses -lpcap
 ```
 
-```
 ## Screenshots etc.
 
 ![Command line options](screenshots/pcaptop_command.png?raw=true)
