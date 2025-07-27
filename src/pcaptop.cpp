@@ -30,10 +30,10 @@
 #define PROMISCUOUS 1
 #define NONPROMISCUOUS 0
 
-#define KEY_BS 127
+#define KEY_LC_A 97
 #define KEY_LC_C 99
 #define KEY_LC_I 105
-#define KEY_LC_R 114
+#define KEY_LC_N 110
 #define KEY_LC_U 117
 
 static struct cag_option options[] = {
@@ -259,7 +259,7 @@ void handleKeys() {
     } else if (key == KEY_LC_C) {
         ips.clear();
         clearTopwin();
-    } else if (key == KEY_LC_I) {
+    } else if (key == KEY_LC_A) {
         ignored.clear();
         clearTopwin();
     } else if (key == KEY_LC_U && last_ignored[0] > 0) {
@@ -303,11 +303,11 @@ void updateUI() {
                     continue;
                 }
 
-                if ((key == KEY_BS || key == KEY_LC_R) && highlight == i) {
-                    if (key == KEY_BS) {
+                if ((key == KEY_LC_I || key == KEY_LC_N) && highlight == i) {
+                    if (key == KEY_LC_I) {
                         ignored[vec[i].first] = vec[i].second;
                         last_ignored = vec[i].first;
-                    } else if (key == KEY_LC_R) {
+                    } else if (key == KEY_LC_N) {
                         ipv4 range = {vec[i].first[0], vec[i].first[1],
                                       vec[i].first[2], 0};
                         ignored[range] = 0;
