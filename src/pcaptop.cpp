@@ -88,17 +88,18 @@ std::unordered_map<ipv4, int, ArrayHasher> ignored;
 
 int highlight = 0;
 int key;
-int c;
+int ignore_list_line;
 std::thread::id uiThreadId;
-pcap_t *handle; /* Session handle */
+pcap_t *handle; /* pcap session handle */
 char *myip;
+ipv4 myipv4;
 bool use_color;
 bool ignored_need_clearing = false;
 bool filtering = false;
 bool syn_only = false;
 bool file_output = false;
 std::ofstream file;
-char *dev = NULL;
+char *dev = NULL;              /* capture device */
 char filter_exp[10] = "port "; /* port filter expression */
 char syn_exp[45] =
     "tcp[tcpflags] & (tcp-syn|tcp-ack) == tcp-syn"; /* SYN filter expression */
@@ -196,13 +197,9 @@ void resetIgnoredRanges() {
 void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
               const u_char *packet) {
 
-    char ip_str[15];
-    char network[12];
     bool syn = false;
 
     ipv4 ip = {packet[26], packet[27], packet[28], packet[29]};
-
-    snprintf(ip_str, 15, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
 
     if (!syn_only) {
         std::bitset<8> flags(packet[47]);
@@ -211,8 +208,9 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
         }
     }
 
-    if (strcmp(ip_str, myip) == 0)
+    if (std::equal(std::begin(ip), std::end(ip), std::begin(myipv4))) {
         return;
+    }
 
     if (ignored_need_clearing) {
         resetIgnoredRanges();
@@ -249,8 +247,6 @@ sortedVector(std::unordered_map<ipv4, int, ArrayHasher> *map) {
     return vec;
 }
 
-void stopCapture() { pcap_breakloop(handle); }
-
 int handleKeys() {
     key = getch();
     if (key == KEY_UP) {
@@ -272,7 +268,7 @@ int handleKeys() {
         last_ignored = {};
         clearTopwin();
     } else if (key == KEY_LC_Q) {
-        stopCapture();
+        pcap_breakloop(handle);
         return 0;
     } else if (key == KEY_RESIZE) {
         endwin();
@@ -350,19 +346,19 @@ void updateUI() {
         }
 
         // output ignore list
-        c = 13;
+        ignore_list_line = 13;
         for (auto &ig : ignored) {
             if (ig.first[3] == 0) {
-                mvwprintw(topwin, c, 3, "%3d.%3d.%3d.%3d /24  ", ig.first[0],
-                          ig.first[1], ig.first[2], ig.first[3]);
+                mvwprintw(topwin, ignore_list_line, 3, "%3d.%3d.%3d.%3d /24  ",
+                          ig.first[0], ig.first[1], ig.first[2], ig.first[3]);
             } else {
-                mvwprintw(topwin, c, 3, "%3d.%3d.%3d.%3d      ", ig.first[0],
-                          ig.first[1], ig.first[2], ig.first[3]);
+                mvwprintw(topwin, ignore_list_line, 3, "%3d.%3d.%3d.%3d      ",
+                          ig.first[0], ig.first[1], ig.first[2], ig.first[3]);
             }
             if (last_ignored == ig.first) {
-                mvwprintw(topwin, c, 23, "u");
+                mvwprintw(topwin, ignore_list_line, 23, "u");
             }
-            c++;
+            ignore_list_line++;
         }
         wrefresh(topwin);
 
@@ -444,6 +440,7 @@ int main(int argc, char *argv[]) {
                      address = address->next) {
                     ipaddress = (struct sockaddr_in *)address->addr;
                     myip = inet_ntoa(ipaddress->sin_addr);
+                    myipv4 = ipFromString(myip);
                 }
 
                 break;

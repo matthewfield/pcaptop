@@ -14,6 +14,7 @@ Filtered packet output from the left pane can optionally be sent concurrently to
 * U - undo last ignored
 * C - clear top list
 * A - clear ignore list
+* Q - quit
 
 C++17, Dependencies: libpcap-dev, libncurses-dev. Builds on OSX and Linux.
 
