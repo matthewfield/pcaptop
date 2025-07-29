@@ -24,7 +24,7 @@
 #include <unordered_map>
 #include <vector>
 
-#define VERSION "1.0.0"
+#define VERSION "1.1.0"
 
 #define RED 1
 #define YELLOW 2
@@ -95,6 +95,7 @@ std::unordered_map<ipv4, int, ArrayHasher> ignored;
 int highlight = 0;
 int key;
 int ignore_list_line;
+int ignore_rows;
 std::thread::id uiThreadId;
 pcap_t *handle; /* pcap session handle */
 char *myip;
@@ -118,14 +119,17 @@ void clearTopwin() {
 }
 
 void redrawUI() {
+    clear();
+    int height, width;
+    getmaxyx(stdscr, height, width);
     refresh();
-    int height = 30;
     titlewin = newwin(4, 64, 1, 1);
     box(titlewin, 0, 0);
-    mainwin = newwin(height - 5, 32, 5, 1);
+    mainwin = newwin(height - 6, 32, 5, 1);
     box(mainwin, 0, 0);
-    scrollwin = newwin(height - 7, 28, 6, 4);
-    topwin = newwin(height - 5, 32, 5, 33);
+    scrollwin = newwin(height - 8, 28, 6, 4);
+    topwin = newwin(height - 6, 32, 5, 33);
+    ignore_rows = height - 9;
     wrefresh(mainwin);
     clearTopwin();
 
@@ -295,7 +299,7 @@ void updateUI() {
             std::vector<pair> vec = sortedVector(&ips);
 
             if (highlight > vec.size() - 1) {
-                highlight = vec.size() - 1;
+                highlight = (int)vec.size() - 1;
             }
 
             wrefresh(scrollwin);
@@ -365,6 +369,11 @@ void updateUI() {
                 mvwprintw(topwin, ignore_list_line, 23, "u");
             }
             ignore_list_line++;
+            if (ignore_list_line > ignore_rows - 1) {
+                mvwprintw(topwin, ignore_list_line, 8, "+%d more",
+                          ignored.size() + 13 - ignore_list_line);
+                break;
+            }
         }
         wrefresh(topwin);
 

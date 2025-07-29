@@ -1,6 +1,7 @@
 # Some basics you will need in your cmake file.
 cmake_minimum_required(VERSION 3.28.0)
 project(pcaptop)
+# set(CMAKE_BUILD_TYPE Debug)
 add_executable(pcaptop src/pcaptop.cpp src/cargs.c)
 set_property(TARGET pcaptop PROPERTY CXX_STANDARD 17)
 
