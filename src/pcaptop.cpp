@@ -24,6 +24,8 @@
 #include <unordered_map>
 #include <vector>
 
+#define VERSION "1.0.0"
+
 #define RED 1
 #define YELLOW 2
 
@@ -58,6 +60,10 @@ static struct cag_option options[] = {
      .access_name = "syn",
      .value_name = NULL,
      .description = "Filter SYN only"},
+    {.identifier = 'v',
+     .access_letters = "v",
+     .access_name = "version",
+     .description = "Version"},
     {.identifier = 'h',
      .access_letters = "h",
      .access_name = "help",
@@ -415,6 +421,9 @@ int main(int argc, char *argv[]) {
         case 'h':
             printf("Usage: pcaptop [OPTION]...\n");
             cag_option_print(options, CAG_ARRAY_SIZE(options), stdout);
+            return EXIT_SUCCESS;
+        case 'v':
+            printf("v%s\n", VERSION);
             return EXIT_SUCCESS;
         }
     }
