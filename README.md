@@ -51,7 +51,7 @@ Only required option is -i for interface. Running the bare pcaptop command will 
 Alternately - capture from en0, filtering only port 443 traffic, and log to output.txt at the same time.
 
 ```console
-sudo ./pcaptop -i en0 -p 443 -f output.txt
+sudo ./pcaptop -i en0 -p 443 -l output.txt
 ```
 
 ## Screenshots etc
