@@ -40,11 +40,11 @@
 #define KEY_LC_U 117
 
 static struct cag_option options[] = {
-    {.identifier = 'f',
-     .access_letters = "f",
-     .access_name = "file",
+    {.identifier = 'l',
+     .access_letters = "l",
+     .access_name = "log-file",
      .value_name = "VALUE",
-     .description = "File to output to"},
+     .description = "Log to file"},
     {.identifier = 'i',
      .access_letters = "i",
      .access_name = "interface",
@@ -105,7 +105,7 @@ bool ignored_need_clearing = false;
 bool filtering = false;
 bool syn_only = false;
 bool file_output = false;
-std::ofstream file;
+std::ofstream logfile;
 char *dev = NULL;              /* capture device */
 char filter_exp[10] = "port "; /* port filter expression */
 char syn_exp[45] =
@@ -399,22 +399,22 @@ int main(int argc, char *argv[]) {
 
     const char *requested_interface = NULL;
     const char *requested_port = NULL;
-    const char *requested_file = NULL;
+    const char *requested_logfile = NULL;
 
     cag_option_context context;
     cag_option_init(&context, options, CAG_ARRAY_SIZE(options), argc, argv);
     while (cag_option_fetch(&context)) {
         switch (cag_option_get_identifier(&context)) {
-        case 'f':
-            requested_file = cag_option_get_value(&context);
-            if (!requested_file) {
+        case 'l':
+            requested_logfile = cag_option_get_value(&context);
+            if (!requested_logfile) {
                 printf("No filename specified\n");
                 return EXIT_SUCCESS;
             } else {
-                file.open(requested_file);
+                logfile.open(requested_logfile);
                 std::streambuf *cout_buf = std::cout.rdbuf();
-                std::streambuf *file_buf = file.rdbuf();
-                std::cout.rdbuf(file_buf);
+                std::streambuf *logfile_buf = logfile.rdbuf();
+                std::cout.rdbuf(logfile_buf);
                 file_output = true;
                 break;
             }
@@ -544,7 +544,7 @@ int main(int argc, char *argv[]) {
     // stopCapture();
     endwin();
     if (file_output) {
-        file.close();
+        logfile.close();
     }
     t_updateUI.join();
 
