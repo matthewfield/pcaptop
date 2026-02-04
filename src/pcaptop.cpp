@@ -3,6 +3,7 @@
 #include <arpa/inet.h>
 #include <bitset>
 #include <chrono>
+#include <cstdlib>
 #include <ctime>
 #include <fstream>
 #include <iostream>
@@ -12,6 +13,7 @@
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 #include <pcap.h>
+#include <regex>
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,6 +42,11 @@
 #define KEY_LC_U 117
 
 static struct cag_option options[] = {
+    {.identifier = 'f',
+     .access_letters = "f",
+     .access_name = "ignore-file",
+     .value_name = "VALUE",
+     .description = "Import ignore list from file"},
     {.identifier = 'l',
      .access_letters = "l",
      .access_name = "log-file",
@@ -91,6 +98,7 @@ struct ArrayHasher {
 ipv4 last_ignored;
 std::unordered_map<ipv4, int, ArrayHasher> ips;
 std::unordered_map<ipv4, int, ArrayHasher> ignored;
+std::unordered_map<ipv4, int, ArrayHasher> ignored_import;
 
 int highlight = 0;
 int key;
@@ -399,16 +407,50 @@ int main(int argc, char *argv[]) {
 
     const char *requested_interface = NULL;
     const char *requested_port = NULL;
+    const char *requested_ignorefile = NULL;
     const char *requested_logfile = NULL;
 
     cag_option_context context;
     cag_option_init(&context, options, CAG_ARRAY_SIZE(options), argc, argv);
     while (cag_option_fetch(&context)) {
         switch (cag_option_get_identifier(&context)) {
+        case 'f':
+            requested_ignorefile = cag_option_get_value(&context);
+            if (!requested_ignorefile) {
+                printf("No ignore filename specified\n");
+                return EXIT_SUCCESS;
+            } else {
+                std::ifstream ignoreFile(requested_ignorefile);
+                if (ignoreFile.fail()) {
+                    printf("Ignore file not found\n");
+                    return EXIT_SUCCESS;
+                }
+                std::string line;
+                std::regex re(
+                    "^((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25["
+                    "0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))/([1-9]{1,2})$");
+                std::smatch m;
+                while (getline(ignoreFile, line)) {
+                    if (!std::regex_match(line, m, re)) {
+                        continue;
+                    }
+                    int bits = stoi(m[2].str());
+                    ipv4 ignoreip = ipFromString(m[1].str());
+                    if (bits == 32 || bits == 24) {
+                        ignored[ignoreip] = 1;
+                    } else {
+                        ignored_import[ignoreip] = bits;
+                    }
+                    auto it = ignored_import.begin();
+                }
+                printf("%lu IP imported\n", ignored_import.size());
+                ignoreFile.close();
+            }
+            break;
         case 'l':
             requested_logfile = cag_option_get_value(&context);
             if (!requested_logfile) {
-                printf("No filename specified\n");
+                printf("No log filename specified\n");
                 return EXIT_SUCCESS;
             } else {
                 logfile.open(requested_logfile);
