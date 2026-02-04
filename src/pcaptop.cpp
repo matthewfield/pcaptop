@@ -40,7 +40,7 @@
 #define KEY_LC_N 110
 #define KEY_LC_Q 113
 #define KEY_LC_U 117
-#define KEY_8 56
+#define KEY_LC_S 115
 
 static struct cag_option options[] = {
     {.identifier = 'f',
@@ -200,9 +200,9 @@ ipv4 ipFromString(std::string ip) {
 
 bool ipIsIgnored(ipv4 ip) {
     ipv4 ipnet24 = {ip[0], ip[1], ip[2], 0};
-    ipv4 ipnet8 = {ip[0], ip[1], 0, 0};
+    ipv4 ipnet16 = {ip[0], ip[1], 0, 0};
     return (ignored.find(ipnet24) != ignored.end() ||
-            ignored.find(ipnet8) != ignored.end() ||
+            ignored.find(ipnet16) != ignored.end() ||
             ignored.find(ip) != ignored.end());
 }
 
@@ -330,7 +330,7 @@ void updateUI() {
                     continue;
                 }
 
-                if ((key == KEY_LC_I || key == KEY_LC_N || key == KEY_8) &&
+                if ((key == KEY_LC_I || key == KEY_LC_N || key == KEY_LC_S) &&
                     highlight == i) {
                     if (key == KEY_LC_I) {
                         ignored[vec[i].first] = vec[i].second;
@@ -340,7 +340,7 @@ void updateUI() {
                                       vec[i].first[2], 0};
                         ignored[range] = 0;
                         last_ignored = range;
-                    } else if (key == KEY_8) {
+                    } else if (key == KEY_LC_S) {
                         ipv4 range = {vec[i].first[0], vec[i].first[1], 0, 0};
                         ignored[range] = 0;
                         last_ignored = range;
@@ -375,7 +375,7 @@ void updateUI() {
         ignore_list_line = 13;
         for (auto &ig : ignored) {
             if (ig.first[2] == 0 && ig.first[3] == 0) {
-                mvwprintw(topwin, ignore_list_line, 3, "%3d.%3d.%3d.%3d /8  ",
+                mvwprintw(topwin, ignore_list_line, 3, "%3d.%3d.%3d.%3d /16  ",
                           ig.first[0], ig.first[1], ig.first[2], ig.first[3]);
             } else if (ig.first[3] == 0) {
                 mvwprintw(topwin, ignore_list_line, 3, "%3d.%3d.%3d.%3d /24  ",
@@ -447,7 +447,7 @@ int main(int argc, char *argv[]) {
                     }
                     int bits = stoi(m[2].str());
                     ipv4 ignoreip = ipFromString(m[1].str());
-                    if (bits == 32 || bits == 24 || bits == 8) {
+                    if (bits == 32 || bits == 24 || bits == 16) {
                         ignored[ignoreip] = 1;
                     } else {
                         ignored_import[ignoreip] = bits;
