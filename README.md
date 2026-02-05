@@ -10,6 +10,7 @@ Filtered packet output from the left pane can optionally be sent concurrently to
 ## Keys:
 * Up/down - select from top list 
 * I - ignore IP
+* S - ignore /16
 * N - ignore /24
 * U - undo last ignored
 * C - clear top list
