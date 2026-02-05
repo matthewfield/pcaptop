@@ -26,7 +26,7 @@
 #include <unordered_map>
 #include <vector>
 
-#define VERSION "1.1.0"
+#define VERSION "1.2.0"
 
 #define RED 1
 #define YELLOW 2
