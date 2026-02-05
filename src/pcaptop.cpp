@@ -193,7 +193,7 @@ ipv4 ipFromString(std::string ip) {
         getline(ss, octet, '.');
         octets.push_back(std::stoul(octet));
     }
-    ipv4 network = {octets[0], octets[1], octets[2], octets[3]};
+    ipv4 network = {octets[0], octets[1], octets[2], octets[3], 32};
     return network;
 }
 
@@ -224,7 +224,7 @@ bool isInNetwork(const char *net, int bits, const char *ip) {
 
 bool ipIsIgnored(ipv4 ip) {
     for (auto &ig : ignored) {
-        if ((!ig.first[4] || ig.first[4] == 32) && ip == ig.first)
+        if (ip == ig.first)
             return true;
         if (isInNetwork(ipToString(ig.first).c_str(), ig.first[4],
                         ipToString(ip).c_str()))
@@ -247,7 +247,7 @@ void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
 
     bool syn = false;
 
-    ipv4 ip = {packet[26], packet[27], packet[28], packet[29]};
+    ipv4 ip = {packet[26], packet[27], packet[28], packet[29], 32};
 
     if (!syn_only) {
         std::bitset<8> flags(packet[47]);
@@ -465,7 +465,7 @@ int main(int argc, char *argv[]) {
                 std::string line;
                 std::regex re(
                     "^((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25["
-                    "0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))/([1-9]{1,2})$");
+                    "0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))/([1-9]{1}[0-9]*)$");
                 std::smatch m;
                 while (getline(ignoreFile, line)) {
                     if (!std::regex_match(line, m, re)) {
