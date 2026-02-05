@@ -82,7 +82,7 @@ WINDOW *titlewin;
 WINDOW *scrollwin;
 WINDOW *topwin;
 
-typedef std::array<unsigned int, 4> ipv4;
+typedef std::array<unsigned int, 5> ipv4;
 typedef std::pair<ipv4, int> pair;
 
 struct ArrayHasher {
@@ -99,7 +99,6 @@ struct ArrayHasher {
 ipv4 last_ignored;
 std::unordered_map<ipv4, int, ArrayHasher> ips;
 std::unordered_map<ipv4, int, ArrayHasher> ignored;
-std::unordered_map<ipv4, int, ArrayHasher> ignored_import;
 
 int highlight = 0;
 int key;
@@ -198,12 +197,40 @@ ipv4 ipFromString(std::string ip) {
     return network;
 }
 
+bool isInNetwork(const char *net, int bits, const char *ip) {
+    in_addr_t _net = inet_addr(net);
+    in_addr_t _ip = inet_addr(ip);
+
+    uint32_t ipv4Netmask;
+    ipv4Netmask = UINT32_MAX;
+    ipv4Netmask <<= 32 - bits;
+
+    unsigned char octet[4];
+
+    for (int i = 0; i < 4; i++) {
+        octet[i] = (ipv4Netmask >> (i * 8)) & 0xFF;
+    }
+
+    char buffer[16];
+    snprintf(buffer, 16, "%d.%d.%d.%d", octet[3], octet[2], octet[1], octet[0]);
+
+    in_addr_t _mask = inet_addr(buffer);
+
+    if ((_mask & _net) == (_mask & _ip)) {
+        return true;
+    }
+    return false;
+}
+
 bool ipIsIgnored(ipv4 ip) {
-    ipv4 ipnet24 = {ip[0], ip[1], ip[2], 0};
-    ipv4 ipnet16 = {ip[0], ip[1], 0, 0};
-    return (ignored.find(ipnet24) != ignored.end() ||
-            ignored.find(ipnet16) != ignored.end() ||
-            ignored.find(ip) != ignored.end());
+    for (auto &ig : ignored) {
+        if ((!ig.first[4] || ig.first[4] == 32) && ip == ig.first)
+            return true;
+        if (isInNetwork(ipToString(ig.first).c_str(), ig.first[4],
+                        ipToString(ip).c_str()))
+            return true;
+    }
+    return false;
 }
 
 void resetIgnoredRanges() {
@@ -337,11 +364,12 @@ void updateUI() {
                         last_ignored = vec[i].first;
                     } else if (key == KEY_LC_N) {
                         ipv4 range = {vec[i].first[0], vec[i].first[1],
-                                      vec[i].first[2], 0};
+                                      vec[i].first[2], 0, 24};
                         ignored[range] = 0;
                         last_ignored = range;
                     } else if (key == KEY_LC_S) {
-                        ipv4 range = {vec[i].first[0], vec[i].first[1], 0, 0};
+                        ipv4 range = {vec[i].first[0], vec[i].first[1], 0, 0,
+                                      16};
                         ignored[range] = 0;
                         last_ignored = range;
                     }
@@ -374,12 +402,10 @@ void updateUI() {
         // output ignore list
         ignore_list_line = 13;
         for (auto &ig : ignored) {
-            if (ig.first[2] == 0 && ig.first[3] == 0) {
-                mvwprintw(topwin, ignore_list_line, 3, "%3d.%3d.%3d.%3d /16  ",
-                          ig.first[0], ig.first[1], ig.first[2], ig.first[3]);
-            } else if (ig.first[3] == 0) {
-                mvwprintw(topwin, ignore_list_line, 3, "%3d.%3d.%3d.%3d /24  ",
-                          ig.first[0], ig.first[1], ig.first[2], ig.first[3]);
+            if (ig.first[4]) {
+                mvwprintw(topwin, ignore_list_line, 3, "%3d.%3d.%3d.%3d /%d  ",
+                          ig.first[0], ig.first[1], ig.first[2], ig.first[3],
+                          ig.first[4]);
             } else {
                 mvwprintw(topwin, ignore_list_line, 3, "%3d.%3d.%3d.%3d      ",
                           ig.first[0], ig.first[1], ig.first[2], ig.first[3]);
@@ -447,14 +473,10 @@ int main(int argc, char *argv[]) {
                     }
                     int bits = stoi(m[2].str());
                     ipv4 ignoreip = ipFromString(m[1].str());
-                    if (bits == 32 || bits == 24 || bits == 16) {
-                        ignored[ignoreip] = 1;
-                    } else {
-                        ignored_import[ignoreip] = bits;
-                    }
-                    auto it = ignored_import.begin();
+                    ignoreip[4] = bits;
+                    ignored[ignoreip] = 1;
                 }
-                printf("%lu IP imported\n", ignored_import.size());
+                printf("%lu IP imported\n", ignored.size());
                 ignoreFile.close();
             }
             break;
