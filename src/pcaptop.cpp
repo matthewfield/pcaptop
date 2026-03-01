@@ -87,10 +87,12 @@ void writeNewPacket(ipv4 ip, int count, bool syn = false) {
     }
 }
 
-std::string ipToString(ipv4 ip) {
+std::string ipToString(ipv4 ip, bool withBitmask = false) {
     std::string ip_str = std::to_string(ip[0]) + "." + std::to_string(ip[1]) +
                          "." + std::to_string(ip[2]) + "." +
                          std::to_string(ip[3]);
+    if (withBitmask)
+        ip_str += "/" + std::to_string(ip[4]);
     return ip_str;
 }
 
@@ -149,6 +151,17 @@ void resetIgnoredRanges() {
         }
     }
     ignored_need_clearing = false;
+}
+
+void blockRange(ipv4 range) {
+    std::ostringstream output;
+    std::string ip(ipToString(range, true));
+
+    output << "echo 'block in from " << ip << " to any' | tee -a /etc/pf.conf";
+
+    system(output.str().c_str());
+    system("pftcl -f /etc/pf.config &> /dev/null");
+    system("pfctl -E &> /dev/null");
 }
 
 void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
@@ -266,7 +279,8 @@ void updateUI() {
                     continue;
                 }
 
-                if ((key == KEY_LC_I || key == KEY_LC_N || key == KEY_LC_S) &&
+                if ((key == KEY_LC_I || key == KEY_LC_N || key == KEY_LC_S ||
+                     key == KEY_LC_B) &&
                     highlight == i) {
                     if (key == KEY_LC_I) {
                         ignored[vec[i].first] = vec[i].second;
@@ -281,6 +295,9 @@ void updateUI() {
                                       16};
                         ignored[range] = 0;
                         last_ignored = range;
+                    } else if (key == KEY_LC_B) {
+                        ipv4 range = vec[i].first;
+                        blockRange(range);
                     }
                     ignored_need_clearing = true;
                     highlight--;

@@ -26,7 +26,7 @@
 #include <unordered_map> // IWYU pragma: keep
 #include <vector>        // IWYU pragma: keep
 
-#define VERSION "1.2.0"
+#define VERSION "1.3.0"
 
 #define RED 1
 #define YELLOW 2
@@ -35,6 +35,7 @@
 #define NONPROMISCUOUS 0
 
 #define KEY_LC_A 97
+#define KEY_LC_B 98
 #define KEY_LC_C 99
 #define KEY_LC_I 105
 #define KEY_LC_N 110
