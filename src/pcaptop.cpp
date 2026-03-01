@@ -157,7 +157,8 @@ void blockRange(ipv4 range) {
     std::ostringstream output;
     std::string ip(ipToString(range, true));
 
-    output << "echo 'block in from " << ip << " to any' | tee -a /etc/pf.conf";
+    output << "echo 'block in from " << ip
+           << " to any' | tee -a /etc/pf.conf &> /dev/null";
 
     system(output.str().c_str());
     system("pftcl -f /etc/pf.config &> /dev/null");
@@ -296,8 +297,9 @@ void updateUI() {
                         ignored[range] = 0;
                         last_ignored = range;
                     } else if (key == KEY_LC_B) {
-                        ipv4 range = vec[i].first;
-                        blockRange(range);
+                        blockRange(vec[i].first);
+                        ignored[vec[i].first] = vec[i].second;
+                        last_ignored = vec[i].first;
                     }
                     ignored_need_clearing = true;
                     highlight--;
