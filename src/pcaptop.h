@@ -34,6 +34,11 @@
 #define PROMISCUOUS 1
 #define NONPROMISCUOUS 0
 
+#define KEY_ESC 27
+#define KEY_1 49
+#define KEY_2 50
+#define KEY_3 51
+#define KEY_4 52
 #define KEY_LC_A 97
 #define KEY_LC_B 98
 #define KEY_LC_C 99

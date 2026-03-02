@@ -1,4 +1,5 @@
 #include "pcaptop.h"
+#include <ncurses.h>
 
 WINDOW *mainwin;
 WINDOW *titlewin;
@@ -22,6 +23,8 @@ bool ignored_need_clearing = false;
 bool filtering = false;
 bool syn_only = false;
 bool file_output = false;
+bool blocking = false;
+ipv4 ip_to_block;
 std::ofstream logfile;
 char *dev = NULL;              /* capture device */
 char filter_exp[10] = "port "; /* port filter expression */
@@ -153,9 +156,24 @@ void resetIgnoredRanges() {
     ignored_need_clearing = false;
 }
 
-void blockRange(ipv4 range) {
+void resetLineTwo() {
+    mvwprintw(titlewin, 2, 10, "   Latest                            ");
+    mvwprintw(titlewin, 2, 45, "Top           ");
+    wrefresh(titlewin);
+}
+
+void blockRange(ipv4 range, int key) {
+    ipv4 block = range;
+    if (key == KEY_2) {
+        block[3] = 0;
+        block[4] = 24;
+    } else if (key == KEY_3) {
+        block[2] = 0;
+        block[3] = 0;
+        block[4] = 16;
+    }
     std::ostringstream output;
-    std::string ip(ipToString(range, true));
+    std::string ip(ipToString(block, true));
 
     output << "echo 'block in from " << ip
            << " to any' | tee -a /etc/pf.conf &> /dev/null";
@@ -163,6 +181,10 @@ void blockRange(ipv4 range) {
     system(output.str().c_str());
     system("pftcl -f /etc/pf.config &> /dev/null");
     system("pfctl -E &> /dev/null");
+    ignored[block] = 0;
+    last_ignored = block;
+    blocking = false;
+    resetLineTwo();
 }
 
 void callback(u_char *useless, const struct pcap_pkthdr *pkthdr,
@@ -220,7 +242,13 @@ sortedVector(std::unordered_map<ipv4, int, ArrayHasher> *map) {
 
 int handleKeys() {
     key = getch();
-    if (key == KEY_UP) {
+    if (blocking && key == KEY_ESC) {
+        blocking = false;
+        resetLineTwo();
+    }
+    if (blocking && (key == KEY_1 || key == KEY_2 || key == KEY_3)) {
+        blockRange(ip_to_block, key);
+    } else if (key == KEY_UP) {
         highlight -= 1;
         if (highlight < 0)
             highlight = 0;
@@ -297,9 +325,13 @@ void updateUI() {
                         ignored[range] = 0;
                         last_ignored = range;
                     } else if (key == KEY_LC_B) {
-                        blockRange(vec[i].first);
-                        ignored[vec[i].first] = vec[i].second;
-                        last_ignored = vec[i].first;
+                        ip_to_block = vec[i].first;
+                        mvwprintw(titlewin, 2, 10, "Block    ");
+                        mvwprintw(titlewin, 2, 18,
+                                  ipToString(ip_to_block, false).c_str());
+                        mvwprintw(titlewin, 2, 34, "(1) /32 (2) /24 (3) /16");
+                        wrefresh(titlewin);
+                        blocking = true;
                     }
                     ignored_need_clearing = true;
                     highlight--;
