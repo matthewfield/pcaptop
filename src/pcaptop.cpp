@@ -332,12 +332,12 @@ void updateUI() {
                                       16};
                         ignored[range] = 0;
                         last_ignored = range;
-                    } else if (key == KEY_LC_B) {
+                    } else if (key == KEY_LC_B && OS_OSX) {
                         ip_to_block = vec[i].first;
                         mvwprintw(titlewin, 2, 8, "Block    ");
                         mvwprintw(titlewin, 2, 15,
                                   ipToString(ip_to_block, false).c_str());
-                        mvwprintw(titlewin, 2, 32,
+                        mvwprintw(titlewin, 2, 31,
                                   "(1) /32 (2) /24 (3) /22 (4) /24");
                         wrefresh(titlewin);
                         blocking = true;

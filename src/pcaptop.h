@@ -26,6 +26,10 @@
 #include <unordered_map> // IWYU pragma: keep
 #include <vector>        // IWYU pragma: keep
 
+#ifdef __APPLE__
+#define OS_OSX 1
+#endif
+
 #define VERSION "1.3.0"
 
 #define RED 1
