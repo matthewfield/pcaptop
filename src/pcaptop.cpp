@@ -157,23 +157,14 @@ void resetIgnoredRanges() {
 }
 
 void resetLineTwo() {
-    mvwprintw(titlewin, 2, 10, "   Latest                            ");
-    mvwprintw(titlewin, 2, 45, "Top           ");
+    mvwprintw(titlewin, 2, 8, "     Latest                            ");
+    mvwprintw(titlewin, 2, 45, "Top               ");
     wrefresh(titlewin);
 }
 
-void blockRange(ipv4 range, int key) {
-    ipv4 block = range;
-    if (key == KEY_2) {
-        block[3] = 0;
-        block[4] = 24;
-    } else if (key == KEY_3) {
-        block[2] = 0;
-        block[3] = 0;
-        block[4] = 16;
-    }
+void pfBlock(ipv4 range) {
     std::ostringstream output;
-    std::string ip(ipToString(block, true));
+    std::string ip(ipToString(range, true));
 
     output << "echo 'block in from " << ip
            << " to any' | tee -a /etc/pf.conf &> /dev/null";
@@ -181,8 +172,24 @@ void blockRange(ipv4 range, int key) {
     system(output.str().c_str());
     system("pftcl -f /etc/pf.config &> /dev/null");
     system("pfctl -E &> /dev/null");
-    ignored[block] = 0;
-    last_ignored = block;
+}
+
+void blockRange(ipv4 ip, int key) {
+    ipv4 cidr = ip;
+    if (key == KEY_2) {
+        cidr[3] = 0;
+        cidr[4] = 24;
+    } else if (key == KEY_3) {
+        cidr[3] = 0;
+        cidr[4] = 22;
+    } else if (key == KEY_4) {
+        cidr[2] = 0;
+        cidr[3] = 0;
+        cidr[4] = 16;
+    }
+    pfBlock(cidr);
+    ignored[cidr] = 0;
+    last_ignored = cidr;
     blocking = false;
     resetLineTwo();
 }
@@ -246,7 +253,8 @@ int handleKeys() {
         blocking = false;
         resetLineTwo();
     }
-    if (blocking && (key == KEY_1 || key == KEY_2 || key == KEY_3)) {
+    if (blocking &&
+        (key == KEY_1 || key == KEY_2 || key == KEY_3 || key == KEY_4)) {
         blockRange(ip_to_block, key);
     } else if (key == KEY_UP) {
         highlight -= 1;
@@ -326,10 +334,11 @@ void updateUI() {
                         last_ignored = range;
                     } else if (key == KEY_LC_B) {
                         ip_to_block = vec[i].first;
-                        mvwprintw(titlewin, 2, 10, "Block    ");
-                        mvwprintw(titlewin, 2, 18,
+                        mvwprintw(titlewin, 2, 8, "Block    ");
+                        mvwprintw(titlewin, 2, 15,
                                   ipToString(ip_to_block, false).c_str());
-                        mvwprintw(titlewin, 2, 34, "(1) /32 (2) /24 (3) /16");
+                        mvwprintw(titlewin, 2, 32,
+                                  "(1) /32 (2) /24 (3) /22 (4) /24");
                         wrefresh(titlewin);
                         blocking = true;
                     }
