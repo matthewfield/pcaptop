@@ -338,7 +338,7 @@ void updateUI() {
                         mvwprintw(titlewin, 2, 15,
                                   ipToString(ip_to_block, false).c_str());
                         mvwprintw(titlewin, 2, 31,
-                                  "(1) /32 (2) /24 (3) /22 (4) /24");
+                                  "(1) /32 (2) /24 (3) /22 (4) /16");
                         wrefresh(titlewin);
                         blocking = true;
                     }
